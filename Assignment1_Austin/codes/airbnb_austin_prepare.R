@@ -42,9 +42,73 @@ df <- df %>% filter(room_type == 'Entire home/apt')
 # replace 'Entire home/apt' to 'apartments' to make it clearer
 df$room_type <- 'apartments'
 
-# create columns for availability at least 1 day per year and more than 100 reviews binary variables
-df <- df %>%  mutate(available = ifelse(availability_365 > 0 , 1, 0),
-                     reviews_morethan_100 = ifelse(number_of_reviews > 100, 1, 0))
+
+########
+# check potential variables for setting theme as dummies and how to classfy theme
+
+# check price based on distance:
+ggplot(df, aes(x=distance, y=price)) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+# there is one case where the price equals to 1, it is dropped:
+df <- df %>%  filter(price > 1)
+
+# create price_per_night column:
+df <- df %>%  mutate(price_per_night = price/minimum_nights)
+
+# remove extreme values where price_per_night is over 200
+df <- df %>% filter(price_per_night < 100)
+
+# check again price_per_night based on distance:
+# check price based on distance:
+ggplot(df, aes(x=distance, y=price_per_night)) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+
+
+
+# check price for availability:
+ggplot(df, aes(x=availability_365, y=price_per_night)) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+# remove where availability is lower than 1 day
+df <- df %>% filter(availability_365 > 0)
+
+
+
+
+# check prices per night for number of reviews
+ggplot(df, aes(x=number_of_reviews, y=price_per_night)) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+
+
+
+# check frequency and basic descriptives for distance:
+qplot(df$distance, geom="histogram")
+summary(df$distance)
+
+
+# check frequency and basic descriptives for availability:
+qplot(df$availability_365, geom="histogram")
+summary(df$availability_365)
+
+# check frequency and basic descriptives for number of reviews
+qplot(df$number_of_reviews, geom="histogram")
+summary(df$number_of_reviews)
+
+
+
+
+# dummy variables: binary variables, 1-yes, 0-no
+# availability at least 30 day per year, more than 100 reviews, distance more than 15 km from the city centre
+df <- df %>%  mutate(available_morethan_30 = ifelse(availability_365 > 200 , 1, 0),
+                     reviews_morethan_100 = ifelse(number_of_reviews > 100, 1, 0),
+                     distance_morethan_15 = ifelse(distance < 15, 1, 0))
 
 
 # save cleaned df to csv file:

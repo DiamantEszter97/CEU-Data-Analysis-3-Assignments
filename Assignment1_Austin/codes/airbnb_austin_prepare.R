@@ -8,26 +8,46 @@ rm(list=ls())
 # Import libraries
 library(tidyverse)
 library(modelsummary)
+library(geosphere)
 
 
 # set working directory
-setwd("C:/Users/diama/Documents/CEU-BA-Assignments/DataAnalysis3/Assignment1_Austin")
+dir <- "C:/Users/diama/Documents/CEU-BA-Assignments/CEU-Data-Analysis-3-Assignments/Assignment1_Austin"
 
-# option A: open material as project
-# option B: set working directory for da_case_studies
-#           example: setwd("C:/Users/bekes.gabor/Documents/github/da_case_studies/")
+# load data:
+austin <- read_csv("https://raw.githubusercontent.com/DiamantEszter97/CEU-Data-Analysis-3-Assignments/main/Assignment1_Austin/data/raw/austin_listings.csv")
 
-# set data dir, data used
-source("set-data-directory.R")             # data_dir must be first defined 
-# alternative: give full path here, 
-#            example data_dir="C:/Users/bekes.gabor/Dropbox (MTA KRTK)/bekes_kezdi_textbook/da_data_repo"
+# save austin dataframe to another to make corrections easier:
+austin_df <- austin
 
-# load theme and functions
-source("ch00-tech-prep/theme_bg.R")
-source("ch00-tech-prep/da_helper_functions.R")
+# add the latitude and longitude of the city center to calculate the distance
+austin_df$long <- austin_df$longitude
+austin_df$lat <- austin_df$latitude
+austin_df$cen_long <- -97.7444
+austin_df$cen_lat <- 30.2729
 
-use_case_dir <- "ch16-airbnb-random-forest/"
-data_in <- paste(data_dir,"airbnb","clean/", sep = "/")
-data_out <- use_case_dir
-output <- paste0(use_case_dir,"output/")
-create_output_if_doesnt_exist(output)
+# calculate distance km
+austin_df$distance <- (distHaversine(austin_df[,17:18], austin_df[,19:20])/1000)
+
+# select coluns that are required for the further analysis:
+df <- austin_df %>%  select(c(neighbourhood, room_type, price, minimum_nights, number_of_reviews,
+                              reviews_per_month, calculated_host_listings_count, availability_365, distance))
+
+# remove austin_df because anytime a correction is needed, it is needed to be reload with the original austin dataframe
+# rm(austin_df)
+
+# filter only apartments
+df <- df %>% filter(room_type == 'Entire home/apt')
+
+# replace 'Entire home/apt' to 'apartments' to make it clearer
+df$room_type <- 'apartments'
+
+# create columns for availability at least 1 day per year and more than 100 reviews binary variables
+df <- df %>%  mutate(available = ifelse(availability_365 > 0 , 1, 0),
+                     reviews_morethan_100 = ifelse(number_of_reviews > 100, 1, 0))
+
+
+# save cleaned df to csv file:
+write_csv(df, paste0(dir, '/data/clean/austin_cleaned.csv'))
+
+

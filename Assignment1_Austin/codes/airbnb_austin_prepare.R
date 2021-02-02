@@ -99,8 +99,9 @@ ggplot(df, aes(x=availability_365, y=price_per_night)) +
   geom_point() +
   geom_smooth(method = "loess")
 
-# remove where availability is lower than 1 day
+# remove where availability is lower than 1 day and more than 365
 df <- df %>% filter(availability_365 > 0)
+df <- df %>% filter(availability_365 < 366)
 
 
 
@@ -119,24 +120,50 @@ ggplot(df, aes(x=neighbourhood, y=price_per_night)) +
 
 #########################
 # check frequency and basic descriptives for distance:
-qplot(df$distance, geom="histogram")
+b1 <- ggplot(df, aes(x=distance)) +
+  geom_histogram(color = "mintcream", fill = "cornflowerblue") +
+  xlim(c(0,25)) +
+  labs(x = "Distance from the city centre",y = "Count") +
+  theme_bw()
+b1
+
 summary(df$distance)
 
 
 # check frequency and basic descriptives for availability:
-qplot(df$availability_365, geom="histogram")
+b2 <- ggplot(df, aes(x=availability_365)) +
+  geom_histogram(color = "mintcream", fill = "cornflowerblue") +
+  xlim(c(0,365)) +
+  ylim(c(0,200)) +
+  labs(x = "Number of days available in one year",y = "Count") +
+  theme_bw()
+b2
+
 summary(df$availability_365)
 
 # check frequency and basic descriptives for number of reviews
-qplot(df$number_of_reviews, geom="histogram")
+b3 <- ggplot(df, aes(x=number_of_reviews)) +
+  geom_histogram(color = "mintcream", fill = "cornflowerblue") +
+  labs(x = "Number of reviews",y = "Count") +
+  xlim(c(0,400)) +
+  ylim(c(0,500)) +
+  theme_bw()
+b3
 summary(df$number_of_reviews)
 
+# minimum nights:
+ggplot(df, aes(x=minimum_nights)) +
+  geom_histogram(color = "mintcream", fill = "cornflowerblue")  +
+  labs(x = "Number of minimum nights to rent",y = "Count") +
+  xlim(c(1,365)) +
+  ylim(c(0,120)) +
+  theme_bw()
 
-
+summary(df$minimum_nights)
 
 # dummy variables: binary variables, 1-yes, 0-no
 # availability at least 30 day per year, more than 100 reviews, distance more than 15 km from the city centre
-df <- df %>%  mutate(available_morethan_30 = ifelse(availability_365 > 200 , 1, 0),
+df <- df %>%  mutate(available_morethan_200 = ifelse(availability_365 > 200 , 1, 0),
                      reviews_morethan_100 = ifelse(number_of_reviews > 100, 1, 0),
                      distance_morethan_15 = ifelse(distance < 15, 1, 0),
                      good_neighbourhood = ifelse(neighbourhood > 78740, 1, 0))
@@ -148,17 +175,19 @@ df <- df %>%
   mutate(ln_price = log(price_per_night))
 
 
-# Histograms
-lnprice <- ggplot(df, aes(ln_price)) +
-  geom_histogram(binwidth = 0.15) +
-  ylab("Count") +
+# scatterplots with regression lines
+lnprice <- ggplot(df, aes(x = distance, y = ln_price)) +
+  geom_point() +
+  geom_smooth(method = "loess") +
+  ylab("distance") +
   xlab("Log price")
 lnprice
 
 
-price <- ggplot(df, aes(price_per_night)) +
-  geom_histogram(binwidth = 25) +
-  ylab("count") +
+price <- ggplot(df, aes(x = distance, y = price_per_night)) +
+  geom_point() +
+  geom_smooth(method = "loess") +
+  ylab("distance") +
   xlab("Price")
 price
 

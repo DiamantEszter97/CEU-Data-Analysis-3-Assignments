@@ -65,24 +65,40 @@ describe(df$room_type)
 
 # Histograms
 # price
-g3a <- ggplot(data=df, aes(x=price_per_night)) +
+g3a <- ggplot(data=df, aes(x=price)) +
   geom_histogram_da(type="percent", binwidth = 10) +
   #geom_histogram(aes(y = (..count..)/sum(..count..)), binwidth = 10, boundary=0,
   #               color = color.outline, fill = color[1], size = 0.25, alpha = 0.8,  show.legend=F,  na.rm=TRUE) +
   #  coord_cartesian(xlim = c(0, 400)) +
   labs(x = "Price (US dollars)",y = "Percent")+
   scale_y_continuous(expand = c(0.00,0.00),limits=c(0, 0.15), breaks = seq(0, 0.15, by = 0.03), labels = scales::percent_format(1)) +
-  scale_x_continuous(expand = c(0.00,0.00),limits=c(0,100), breaks = seq(0,100, 20))
+  scale_x_continuous(expand = c(0.00,0.00),limits=c(10,100), breaks = seq(0,400, 50)) +
+  theme_bg() 
 g3a
 
-## Boxplot of price by room type
-g4 <- ggplot(data = df, aes(x = room_type, y = price_per_night)) +
-  stat_boxplot(geom = "errorbar", width = 0.3, size = 0.5, na.rm=T)+
-  geom_boxplot(size = 0.5, width = 0.6, alpha = 0.3, na.rm=T, outlier.shape = NA) +
-  scale_y_continuous(expand = c(0.01,0.01),limits = c(0,100), breaks = seq(0,100,50)) +
-  labs(x = "Room type",y = "Price (US dollars)")
-g4
 
+g3b<- ggplot(data=df, aes(x=ln_price)) +
+  geom_histogram_da(type="percent", binwidth = 0.2) +
+  #  geom_histogram(aes(y = (..count..)/sum(..count..)), binwidth = 0.18,
+  #               color = color.outline, fill = color[1], size = 0.25, alpha = 0.8,  show.legend=F,  na.rm=TRUE) +
+  coord_cartesian(xlim = c(2.5, 4.8)) +
+  scale_y_continuous(expand = c(0.00,0.00),limits=c(0, 0.15), breaks = seq(0, 0.15, by = 0.05), labels = scales::percent_format(5L)) +
+  scale_x_continuous(expand = c(0.00,0.01),breaks = seq(2.4,4.8, 0.6)) +
+  labs(x = "ln(price, US dollars)",y = "Percent")+
+  theme_bg() 
+g3b
+
+## Boxplot of price by room type
+g4 <- ggplot(data = df, aes(x = room_type, y = price)) +
+  stat_boxplot(aes(group = room_type), geom = "errorbar", width = 0.3,
+               color = c(color[2],color[1], color[3]), size = 0.5, na.rm=T)+
+  geom_boxplot(aes(group = room_type),
+               color = c(color[2],color[1], color[3]), fill = c(color[2],color[1], color[3]),
+               size = 0.5, width = 0.6, alpha = 0.3, na.rm=T, outlier.shape = NA) +
+  scale_y_continuous(expand = c(0.01,0.01),limits = c(0,100), breaks = seq(0,300,100)) +
+  labs(x = "Room type",y = "Price (US dollars)")+
+  theme_bg()
+g4
 
 #####################
 # Setting up models #
@@ -95,7 +111,7 @@ basic_lev  <- c("distance", "neighbourhood", "availability_365")
 reviews <- c("number_of_reviews","reviews_per_month")
 
 # binaries
-binaries <- c("available_morethan_30", 'reviews_morethan_100', "distance_morethan_15", "good_neighbourhood")
+binaries <- c("available_morethan_200", 'reviews_morethan_100', "distance_morethan_15", "good_neighbourhood")
 
 
 #################################################
@@ -104,7 +120,7 @@ binaries <- c("available_morethan_30", 'reviews_morethan_100', "distance_moretha
 
 #Look up room type interactions
 p1 <- price_diff_by_variables2(df, "distance", "distance_morethan_15", "number_of_reviews", "reviews_morethan_100")
-p2 <- price_diff_by_variables2(df, "availability_365", "available_morethan_30", "distance", "distance_morethan_15")
+p2 <- price_diff_by_variables2(df, "availability_365", "available_morethan_200", "distance", "distance_morethan_15")
 
 g_interactions <- plot_grid(p1, p2, nrow=1, ncol=2)
 g_interactions
@@ -325,7 +341,7 @@ reviews <- c("number_of_reviews", "reviews_per_month")
 
 
 # binaries
-binaries <- c("available_morethan_30", 'reviews_morethan_100', "distance_morethan_15", "good_neighbourhood")
+binaries <- c("available_morethan_200", 'reviews_morethan_100', "distance_morethan_15", "good_neighbourhood")
 
 predictors_1 <- c(basic_vars)
 predictors_2 <- c(basic_vars, reviews, binaries)

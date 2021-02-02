@@ -11,8 +11,30 @@ library(modelsummary)
 library(geosphere)
 library(ggplot2)
 
-# set working directory
+# set working environment
 dir <- "C:/Users/diama/Documents/CEU-BA-Assignments/CEU-Data-Analysis-3-Assignments/Assignment1_Austin"
+setwd("c:/Users/diama/Documents/CEU-Business-Analytics-2020/Data_Analysis3/class_material/da_case_studies/")
+
+# option A: open material as project
+# option B: set working directory for da_case_studies
+#           example: setwd("C:/Users/bekes.gabor/Documents/github/da_case_studies/")
+
+# set data dir, load theme and functions
+source("ch00-tech-prep/theme_bg.R")
+source("ch00-tech-prep/da_helper_functions.R")
+
+# data used
+source("set-data-directory.R") #data_dir must be first defined #
+data_dir <- "c:/Users/diama/Documents/CEU-Business-Analytics-2020/Data_Analysis3/class_material/da_data_repo/"
+data_in <- paste(data_dir,"airbnb","clean/", sep = "/")
+
+use_case_dir <- "ch14-airbnb-reg/"
+data_out <- use_case_dir
+output <- paste0(use_case_dir,"output/")
+create_output_if_doesnt_exist(output)
+
+options(digits = 3)
+
 
 # load data:
 austin <- read_csv("https://raw.githubusercontent.com/DiamantEszter97/CEU-Data-Analysis-3-Assignments/main/Assignment1_Austin/data/raw/austin_listings.csv")

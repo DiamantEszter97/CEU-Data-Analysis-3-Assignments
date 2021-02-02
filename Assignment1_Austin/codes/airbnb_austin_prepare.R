@@ -9,7 +9,7 @@ rm(list=ls())
 library(tidyverse)
 library(modelsummary)
 library(geosphere)
-
+library(ggplot2)
 
 # set working directory
 dir <- "C:/Users/diama/Documents/CEU-BA-Assignments/CEU-Data-Analysis-3-Assignments/Assignment1_Austin"
@@ -51,7 +51,10 @@ ggplot(df, aes(x=distance, y=price)) +
   geom_point() +
   geom_smooth(method = "loess")
 
+
+# price misiing value dropped
 # there is one case where the price equals to 1, it is dropped:
+df <- df %>% drop_na(price)
 df <- df %>%  filter(price > 1)
 
 # create price_per_night column:
@@ -86,8 +89,13 @@ ggplot(df, aes(x=number_of_reviews, y=price_per_night)) +
   geom_smooth(method = "loess")
 
 
+# check for neighbourhood:
+ggplot(df, aes(x=neighbourhood, y=price_per_night)) +
+  geom_point() +
+  geom_smooth(method = "loess")
 
 
+#########################
 # check frequency and basic descriptives for distance:
 qplot(df$distance, geom="histogram")
 summary(df$distance)
@@ -108,7 +116,29 @@ summary(df$number_of_reviews)
 # availability at least 30 day per year, more than 100 reviews, distance more than 15 km from the city centre
 df <- df %>%  mutate(available_morethan_30 = ifelse(availability_365 > 200 , 1, 0),
                      reviews_morethan_100 = ifelse(number_of_reviews > 100, 1, 0),
-                     distance_morethan_15 = ifelse(distance < 15, 1, 0))
+                     distance_morethan_15 = ifelse(distance < 15, 1, 0),
+                     good_neighbourhood = ifelse(neighbourhood > 78740, 1, 0))
+
+
+
+# check ln prices:
+df <- df %>%
+  mutate(ln_price = log(price_per_night))
+
+
+# Histograms
+lnprice <- ggplot(df, aes(ln_price)) +
+  geom_histogram(binwidth = 0.15) +
+  ylab("Count") +
+  xlab("Log price")
+lnprice
+
+
+price <- ggplot(df, aes(price_per_night)) +
+  geom_histogram(binwidth = 25) +
+  ylab("count") +
+  xlab("Price")
+price
 
 
 # save cleaned df to csv file:

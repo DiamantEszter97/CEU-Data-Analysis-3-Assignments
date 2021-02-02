@@ -69,7 +69,7 @@ df$room_type <- 'apartments'
 # check potential variables for setting theme as dummies and how to classfy theme
 
 # check price based on distance:
-ggplot(df, aes(x=distance, y=price)) +
+cp1 <-ggplot(df, aes(x=distance, y=price)) +
   geom_point() +
   geom_smooth(method = "loess")
 
@@ -87,7 +87,7 @@ df <- df %>% filter(price_per_night < 100)
 
 # check again price_per_night based on distance:
 # check price based on distance:
-ggplot(df, aes(x=distance, y=price_per_night)) +
+cp2 <-  ggplot(df, aes(x=distance, y=price_per_night)) +
   geom_point() +
   geom_smooth(method = "loess")
 
@@ -95,7 +95,7 @@ ggplot(df, aes(x=distance, y=price_per_night)) +
 
 
 # check price for availability:
-ggplot(df, aes(x=availability_365, y=price_per_night)) +
+cp3 <- ggplot(df, aes(x=availability_365, y=price_per_night)) +
   geom_point() +
   geom_smooth(method = "loess")
 
@@ -107,13 +107,13 @@ df <- df %>% filter(availability_365 < 366)
 
 
 # check prices per night for number of reviews
-ggplot(df, aes(x=number_of_reviews, y=price_per_night)) +
+cp4 <- ggplot(df, aes(x=number_of_reviews, y=price_per_night)) +
   geom_point() +
   geom_smooth(method = "loess")
 
 
 # check for neighbourhood:
-ggplot(df, aes(x=neighbourhood, y=price_per_night)) +
+cp5 <- ggplot(df, aes(x=neighbourhood, y=price_per_night)) +
   geom_point() +
   geom_smooth(method = "loess")
 
@@ -127,7 +127,7 @@ b1 <- ggplot(df, aes(x=distance)) +
   theme_bw()
 b1
 
-summary(df$distance)
+s1 <- summary(df$distance)
 
 
 # check frequency and basic descriptives for availability:
@@ -137,9 +137,8 @@ b2 <- ggplot(df, aes(x=availability_365)) +
   ylim(c(0,200)) +
   labs(x = "Number of days available in one year",y = "Count") +
   theme_bw()
-b2
 
-summary(df$availability_365)
+s2 <- summary(df$availability_365)
 
 # check frequency and basic descriptives for number of reviews
 b3 <- ggplot(df, aes(x=number_of_reviews)) +
@@ -148,18 +147,24 @@ b3 <- ggplot(df, aes(x=number_of_reviews)) +
   xlim(c(0,400)) +
   ylim(c(0,500)) +
   theme_bw()
-b3
-summary(df$number_of_reviews)
+s3 <- summary(df$number_of_reviews)
 
 # minimum nights:
-ggplot(df, aes(x=minimum_nights)) +
+b4 <- ggplot(df, aes(x=minimum_nights)) +
   geom_histogram(color = "mintcream", fill = "cornflowerblue")  +
   labs(x = "Number of minimum nights to rent",y = "Count") +
   xlim(c(1,365)) +
   ylim(c(0,120)) +
   theme_bw()
 
-summary(df$minimum_nights)
+s4 <- summary(df$minimum_nights)
+
+
+summary_list <- c(s1, s2, s3, s4)
+summary_table <- c()
+summary_table <- t(cbind(summary_list))
+rownames(summary_table) <- c("Distance", "Days available in one year", "Number of reviews", "Minumum Nights for rent")
+
 
 # dummy variables: binary variables, 1-yes, 0-no
 # availability at least 30 day per year, more than 100 reviews, distance more than 15 km from the city centre
@@ -181,7 +186,6 @@ lnprice <- ggplot(df, aes(x = distance, y = ln_price)) +
   geom_smooth(method = "loess") +
   ylab("distance") +
   xlab("Log price")
-lnprice
 
 
 price <- ggplot(df, aes(x = distance, y = price_per_night)) +
@@ -189,7 +193,6 @@ price <- ggplot(df, aes(x = distance, y = price_per_night)) +
   geom_smooth(method = "loess") +
   ylab("distance") +
   xlab("Price")
-price
 
 
 # save cleaned df to csv file:

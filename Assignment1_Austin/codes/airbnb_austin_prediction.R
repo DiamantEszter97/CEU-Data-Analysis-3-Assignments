@@ -268,10 +268,18 @@ model3_level <- model_results_cv[["modellev3"]][["model_work_data"]]
 model4_level <- model_results_cv[["modellev4"]][["model_work_data"]]
 
 
-# look at holdout RMSE
+# look at holdout RMSE for model3
+model3_level_work_rmse <- mse_lev(predict(model3_level, newdata = data_work), data_work[,"price"] %>% pull)**(1/2)
+model3_level_holdout_rmse <- mse_lev(predict(model3_level, newdata = data_holdout), data_holdout[,"price"] %>% pull)**(1/2)
+model3_level_holdout_rmse
+model3_level_work_rmse
+
+
+# look at holdout RMSE for model4
 model4_level_work_rmse <- mse_lev(predict(model4_level, newdata = data_work), data_work[,"price"] %>% pull)**(1/2)
 model4_level_holdout_rmse <- mse_lev(predict(model4_level, newdata = data_holdout), data_holdout[,"price"] %>% pull)**(1/2)
 model4_level_holdout_rmse
+model4_level_work_rmse
 
 # probably in training, it is overfitted
 
@@ -290,7 +298,7 @@ Y5p <- quantile(Ylev, 0.05, na.rm=TRUE)
 Y95p <- quantile(Ylev, 0.95, na.rm=TRUE)
 
 # Predicted values
-predictionlev_holdout_pred <- as.data.frame(predict(model34_level, newdata = data_holdout, interval="predict")) %>%
+predictionlev_holdout_pred <- as.data.frame(predict(model4_level, newdata = data_holdout, interval="predict")) %>%
   rename(pred_lwr = lwr, pred_upr = upr)
 predictionlev_holdout_conf <- as.data.frame(predict(model4_level, newdata = data_holdout, interval="confidence")) %>%
   rename(conf_lwr = lwr, conf_upr = upr)
@@ -354,9 +362,9 @@ train_control <- trainControl(method = "cv",
 
 # set tuning
 tune_grid <- expand.grid(
-  .mtry = c(1, 3),
+  .mtry = c(1, 2),
   .splitrule = "variance",
-  .min.node.size = c(5, 10)
+  .min.node.size = c(2, 4)
 )
 
 
@@ -376,9 +384,9 @@ rf_model_1
 
 # set tuning for benchamrk model (2)
 tune_grid <- expand.grid(
-  .mtry = c(2, 4),
+  .mtry = c(1, 2),
   .splitrule = "variance",
-  .min.node.size = c(5, 10)
+  .min.node.size = c(1, 3)
 )
 
 set.seed(1050)

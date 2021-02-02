@@ -28,14 +28,10 @@ library(directlabels)
 library(cowplot)
 library(dplyr)
 library(ggplot2)
+library(geosphere)
 
 ```
 
-## Introduction
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r, echo = FALSE , results = "asis", warning = FALSE, message = FALSE, include=FALSE}
 dir <- "C:/Users/diama/Documents/CEU-BA-Assignments/CEU-Data-Analysis-3-Assignments/Assignment1_Austin"
@@ -61,32 +57,686 @@ create_output_if_doesnt_exist(output)
 
 options(digits = 3)
 
+
+##################################
+# DATA PREPARATION
+
+# load data:
+austin <- read_csv("https://raw.githubusercontent.com/DiamantEszter97/CEU-Data-Analysis-3-Assignments/main/Assignment1_Austin/data/raw/austin_listings.csv")
+
+# save austin dataframe to another to make corrections easier:
+austin_df <- austin
+
+# add the latitude and longitude of the city center to calculate the distance
+austin_df$long <- austin_df$longitude
+austin_df$lat <- austin_df$latitude
+austin_df$cen_long <- -97.7444
+austin_df$cen_lat <- 30.2729
+
+# calculate distance km
+austin_df$distance <- (distHaversine(austin_df[,17:18], austin_df[,19:20])/1000)
+
+# select coluns that are required for the further analysis:
+df <- austin_df %>%  select(c(neighbourhood, room_type, price, minimum_nights, number_of_reviews,
+                              reviews_per_month, calculated_host_listings_count, availability_365, distance))
+
+# remove austin_df because anytime a correction is needed, it is needed to be reload with the original austin dataframe
+# rm(austin_df)
+
+# filter only apartments
+df <- df %>% filter(room_type == 'Entire home/apt')
+
+# replace 'Entire home/apt' to 'apartments' to make it clearer
+df$room_type <- 'apartments'
+
+
+########
+# check potential variables for setting theme as dummies and how to classfy theme
+
+# check price based on distance:
+cp1 <-ggplot(df, aes(x=distance, y=price)) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+
+# price misiing value dropped
+# there is one case where the price equals to 1, it is dropped:
+df <- df %>% drop_na(price)
+df <- df %>%  filter(price > 1)
+
+# create price_per_night column:
+df <- df %>%  mutate(price_per_night = price/minimum_nights)
+
+# remove extreme values where price_per_night is over 150
+df <- df %>% filter(price_per_night < 150)
+
+# check again price_per_night based on distance:
+# check price based on distance:
+cp2 <-  ggplot(df, aes(x=distance, y=price_per_night)) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+
+
+
+# check price for availability:
+cp3 <- ggplot(df, aes(x=availability_365, y=price_per_night)) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+# remove where availability is lower than 1 day and more than 365
+df <- df %>% filter(availability_365 > 0)
+df <- df %>% filter(availability_365 < 366)
+
+
+
+
+# check prices per night for number of reviews
+cp4 <- ggplot(df, aes(x=number_of_reviews, y=price_per_night)) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+
+# check for neighbourhood:
+cp5 <- ggplot(df, aes(x=neighbourhood, y=price_per_night)) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+
+#########################
+# check frequency and basic descriptives for distance:
+b1 <- ggplot(df, aes(x=distance)) +
+  geom_histogram(color = "mintcream", fill = "cornflowerblue") +
+  xlim(c(0,25)) +
+  labs(x = "Distance from the city centre",y = "Count") +
+  theme_bw()
+b1
+
+s1 <- summary(df$distance)
+
+
+# check frequency and basic descriptives for availability:
+b2 <- ggplot(df, aes(x=availability_365)) +
+  geom_histogram(color = "mintcream", fill = "cornflowerblue") +
+  xlim(c(0,365)) +
+  ylim(c(0,200)) +
+  labs(x = "Number of days available in one year",y = "Count") +
+  theme_bw()
+
+s2 <- summary(df$availability_365)
+
+# check frequency and basic descriptives for number of reviews
+b3 <- ggplot(df, aes(x=number_of_reviews)) +
+  geom_histogram(color = "mintcream", fill = "cornflowerblue") +
+  labs(x = "Number of reviews",y = "Count") +
+  xlim(c(0,400)) +
+  ylim(c(0,500)) +
+  theme_bw()
+s3 <- summary(df$number_of_reviews)
+
+# minimum nights:
+b4 <- ggplot(df, aes(x=minimum_nights)) +
+  geom_histogram(color = "mintcream", fill = "cornflowerblue")  +
+  labs(x = "Number of minimum nights to rent",y = "Count") +
+  xlim(c(1,365)) +
+  ylim(c(0,120)) +
+  theme_bw()
+
+b5 <- ggplot(df, aes(x=price_per_night)) +
+  geom_histogram(color = "mintcream", fill = "cornflowerblue")  +
+  labs(x = "Price per night",y = "Count") +
+  xlim(c(1,150))  +
+  theme_bw()
+
+s4 <- summary(df$minimum_nights)
+
+summary_table <- data.frame()
+summary_table <- rbind(s1, s2, s3, s4)
+rownames(summary_table) <- c("Distance", "Days available in one year", "Number of reviews", "Minumum Nights for rent")
+
+xtb <- xtable(summary_table, type = latex, caption = "Summary statistics for descriptive variables")
+
+
+
+
+# binary variables, 1-yes, 0-no
+# availability at least 30 day per year, more than 100 reviews, distance more than 15 km from the city centre
+df <- df %>%  mutate(available_morethan_200 = ifelse(availability_365 > 200 , 1, 0),
+                     reviews_morethan_100 = ifelse(number_of_reviews > 100, 1, 0),
+                     distance_morethan_15 = ifelse(distance < 15, 1, 0),
+                     good_neighbourhood = ifelse(neighbourhood > 78740, 1, 0))
+
+
+
+# check ln prices:
+df <- df %>%
+  mutate(ln_price = log(price_per_night))
+
+
+# scatterplots with regression lines
+lnprice <- ggplot(df, aes(x = distance, y = ln_price)) +
+  geom_point() +
+  geom_smooth(method = "loess") +
+  ylab("distance") +
+  xlab("Log price")
+
+
+price <- ggplot(df, aes(x = distance, y = price_per_night)) +
+  geom_point() +
+  geom_smooth(method = "loess") +
+  ylab("distance") +
+  xlab("Price")
+
+
+# save cleaned df to csv file:
+write_csv(df, paste0(dir, '/data/clean/austin_cleaned.csv'))
+
+
 ```
+
+```{r, echo = FALSE , results = "asis", warning = FALSE, message = FALSE, include=FALSE}
+
+#############################
+#############################
+#PREDICTION
+#############################
+
+
+# load dataframe:
+austin_df <- read_csv("https://raw.githubusercontent.com/DiamantEszter97/CEU-Data-Analysis-3-Assignments/main/Assignment1_Austin/data/clean/austin_cleaned.csv")
+
+# save austin_df into df to have a quicker way to fix problems:
+df <- austin_df
+
+# set price_per_night to price:
+df <- df %>% select(-price)
+df <- df %>% mutate(price=price_per_night)
+
+# basic descriptives:
+s5 <- summary(df$price)
+
+summary_table2 <- data.frame()
+summary_table2 <- rbind(s5)
+rownames(summary_table2) <- c("Price per Night")
+
+xtb2 <- xtable(summary_table2, type = latex, caption = "Summary statistics for price per night")
+
+
+# check for basic descriptives:
+skimr::skim(df)
+summary(df$price)
+Hmisc::describe(df$price)
+describe(df$room_type)
+
+
+# Distribution of price per nights
+
+# Histograms
+# price
+g3a <- ggplot(data=df, aes(x=price)) +
+  geom_histogram_da(type="percent", binwidth = 10) +
+  #geom_histogram(aes(y = (..count..)/sum(..count..)), binwidth = 10, boundary=0,
+  #               color = color.outline, fill = color[1], size = 0.25, alpha = 0.8,  show.legend=F,  na.rm=TRUE) +
+  #  coord_cartesian(xlim = c(0, 400)) +
+  labs(x = "Price (US dollars)",y = "Percent")+
+  scale_y_continuous(expand = c(0.00,0.00),limits=c(0, 0.15), breaks = seq(0, 0.15, by = 0.03), labels = scales::percent_format(1)) +
+  scale_x_continuous(expand = c(0.00,0.00),limits=c(10,100), breaks = seq(0,400, 50)) +
+  theme_bg() 
+g3a
+
+
+g3b<- ggplot(data=df, aes(x=ln_price)) +
+  geom_histogram_da(type="percent", binwidth = 0.2) +
+  #  geom_histogram(aes(y = (..count..)/sum(..count..)), binwidth = 0.18,
+  #               color = color.outline, fill = color[1], size = 0.25, alpha = 0.8,  show.legend=F,  na.rm=TRUE) +
+  coord_cartesian(xlim = c(2.5, 4.8)) +
+  scale_y_continuous(expand = c(0.00,0.00),limits=c(0, 0.15), breaks = seq(0, 0.15, by = 0.05), labels = scales::percent_format(5L)) +
+  scale_x_continuous(expand = c(0.00,0.01),breaks = seq(2.4,4.8, 0.6)) +
+  labs(x = "ln(price, US dollars)",y = "Percent")+
+  theme_bg() 
+g3b
+
+## Boxplot of price by room type
+g4 <- ggplot(data = df, aes(x = room_type, y = price)) +
+  stat_boxplot(aes(group = room_type), geom = "errorbar", width = 0.3,
+               color = c(color[2]), size = 0.5, na.rm=T)+
+  geom_boxplot(aes(group = room_type),
+               color = c(color[2]), fill = c(color[2]),
+               size = 0.5, width = 0.6, alpha = 0.3, na.rm=T, outlier.shape = NA) +
+  scale_y_continuous(expand = c(0.01,0.01),limits = c(0,100), breaks = seq(0,100,20)) +
+  labs(x = "Room type",y = "Price (US dollars)")+
+  theme_bg()
+g4
+
+#####################
+# Setting up models #
+#####################
+
+# Basic Variables
+basic_lev  <- c("neighbourhood", "availability_365")
+
+# reviews
+reviews <- c("number_of_reviews","reviews_per_month")
+
+# binaries
+binaries <- c("available_morethan_200", 'reviews_morethan_100', "distance_morethan_15", "good_neighbourhood")
+
+
+#################################################
+# Look for interactions
+################################################
+
+#Look up room type interactions
+p1 <- price_diff_by_variables2(df, "distance", "distance_morethan_15", "number_of_reviews", "reviews_morethan_100")
+p2 <- price_diff_by_variables2(df, "availability_365", "available_morethan_200", "neighborhood", "good_neighbourhood")
+
+g_interactions <- plot_grid(p1, p2, nrow=1, ncol=2)
+g_interactions
+
+
+# Create models in levels models: 1-8
+modellev1 <- " ~ distance"
+modellev2 <- paste0(" ~ ",paste(basic_lev,collapse = " + "))
+modellev3 <- paste0(" ~ ",paste(c(basic_lev,reviews),collapse = " + "))
+modellev4 <- paste0(" ~ ",paste(c(basic_lev,reviews,binaries),collapse = " + "))
+
+#################################
+# Separate hold-out set #
+#################################
+
+# create a holdout set (20% of observations)
+smp_size <- floor(0.2 * nrow(df))
+
+# Set the random number generator: It will make results reproducable
+set.seed(1050)
+
+# create ids:
+# 1) seq_len: generate regular sequences
+# 2) sample: select random rows from a table
+holdout_ids <- sample(seq_len(nrow(df)), size = smp_size)
+df$holdout <- 0
+df$holdout[holdout_ids] <- 1
+
+
+#Hold-out set Set
+data_holdout <- df %>% filter(holdout == 1)
+
+#Working data set
+data_work <- df %>% filter(holdout == 0)
+
+
+##############################
+#      cross validation      #
+##############################
+
+## N = 5
+n_folds=5
+# Create the folds
+
+folds_i <- sample(rep(1:n_folds, length.out = nrow(data_work) ))
+# Create results
+model_results_cv <- list()
+
+
+for (i in (1:4)){
+  model_name <-  paste0("modellev",i)
+  model_pretty_name <- paste0("(",i,")")
+  
+  yvar <- "price"
+  xvars <- eval(parse(text = model_name))
+  formula <- formula(paste0(yvar,xvars))
+  
+  # Initialize values
+  rmse_train <- c()
+  rmse_test <- c()
+  
+  model_work_data <- lm(formula,data = data_work)
+  BIC <- BIC(model_work_data)
+  nvars <- model_work_data$rank -1
+  r2 <- summary(model_work_data)$r.squared
+  
+  # Do the k-fold estimation
+  for (k in 1:n_folds) {
+    test_i <- which(folds_i == k)
+    # Train sample: all except test_i
+    data_train <- data_work[-test_i, ]
+    # Test sample
+    data_test <- data_work[test_i, ]
+    # Estimation and prediction
+    model <- lm(formula,data = data_train)
+    prediction_train <- predict(model, newdata = data_train)
+    prediction_test <- predict(model, newdata = data_test)
+    
+    # Criteria evaluation
+    rmse_train[k] <- mse_lev(prediction_train, data_train[,yvar] %>% pull)**(1/2)
+    rmse_test[k] <- mse_lev(prediction_test, data_test[,yvar] %>% pull)**(1/2)
+    
+  }
+  
+  model_results_cv[[model_name]] <- list(yvar=yvar,xvars=xvars,formula=formula,model_work_data=model_work_data,
+                                         rmse_train = rmse_train,rmse_test = rmse_test,BIC = BIC,
+                                         model_name = model_pretty_name, nvars = nvars, r2 = r2)
+}
+
+
+
+
+model <- lm(formula,data = data_train)
+prediction_train <- predict(model, newdata = data_train)
+prediction_test <- predict(model, newdata = data_test)
+
+
+t1 <- imap(model_results_cv,  ~{
+  as.data.frame(.x[c("rmse_test", "rmse_train")]) %>%
+    dplyr::summarise_all(.funs = mean) %>%
+    mutate("model_name" = .y , "model_pretty_name" = .x[["model_name"]] ,
+           "nvars" = .x[["nvars"]], "r2" = .x[["r2"]], "BIC" = .x[["BIC"]])
+}) %>%
+  bind_rows()
+t1
+column_names <- c("Model", "N predictors", "R-squared", "BIC", "Training RMSE",
+                  "Test RMSE")
+
+
+t14_2 <- t1 %>%
+  select("model_pretty_name", "nvars", "r2" , "BIC", "rmse_train", "rmse_test")
+colnames(t14_2) <- column_names
+print(xtable(t14_2, type = "latex", digits=c(0,0,0,2,0,2,2)), file = paste0(dir, "/output/modellev.tex"),
+      include.rownames=FALSE, booktabs=TRUE, floating = FALSE)
+
+
+
+# RMSE training vs test graph
+t1_levels <- t1 %>%
+  dplyr::select("nvars", "rmse_train", "rmse_test") %>%
+  gather(var,value, rmse_train:rmse_test) %>%
+  mutate(nvars2=nvars+1) %>%
+  mutate(var = factor(var, levels = c("rmse_train", "rmse_test"),
+                      labels = c("RMSE Training","RMSE Test")))
+
+t1_levels
+test_table <- c()
+test_table <- cbind(t1_levels)
+
+test_table
+
+model_result_plot_levels <- ggplot(data = t1_levels,
+                                   aes(x = factor(nvars2), y = value, color=factor(var), group = var)) +
+  geom_line(size=1,show.legend=FALSE, na.rm = TRUE) +
+  scale_color_manual(name="",
+                     values=c(color[2],color[1])) +
+  scale_y_continuous(name = "RMSE", limits = c(34, 44), breaks = seq(34,44, 2)) +
+  scale_x_discrete( name = "Number of coefficients", expand=c(0.01, 0.01)) +
+  geom_dl(aes(label = var),  method = list("last.points", dl.trans(x=x-1), cex=0.4))
+  #scale_colour_discrete(guide = 'none') 
+
+model_result_plot_levels
+
+
+
+###################################################
+# Diagnsotics #
+###################################################
+model3_level <- model_results_cv[["modellev3"]][["model_work_data"]]
+model4_level <- model_results_cv[["modellev4"]][["model_work_data"]]
+
+
+# look at holdout RMSE for model3
+model3_level_work_rmse <- mse_lev(predict(model3_level, newdata = data_work), data_work[,"price"] %>% pull)**(1/2)
+model3_level_holdout_rmse <- mse_lev(predict(model3_level, newdata = data_holdout), data_holdout[,"price"] %>% pull)**(1/2)
+model3_level_holdout_rmse
+model3_level_work_rmse
+
+
+# look at holdout RMSE for model4
+model4_level_work_rmse <- mse_lev(predict(model4_level, newdata = data_work), data_work[,"price"] %>% pull)**(1/2)
+model4_level_holdout_rmse <- mse_lev(predict(model4_level, newdata = data_holdout), data_holdout[,"price"] %>% pull)**(1/2)
+model4_level_holdout_rmse
+model4_level_work_rmse
+
+# probably in training, it is overfitted
+
+###################################################
+# FIGURES FOR FITTED VS ACTUAL OUTCOME VARIABLES #
+###################################################
+
+# Target variable
+Ylev <- data_holdout[["price"]]
+
+meanY <-mean(Ylev)
+sdY <- sd(Ylev)
+meanY_m2SE <- meanY -1.96 * sdY
+meanY_p2SE <- meanY + 1.96 * sdY
+Y5p <- quantile(Ylev, 0.05, na.rm=TRUE)
+Y95p <- quantile(Ylev, 0.95, na.rm=TRUE)
+
+# Predicted values
+predictionlev_holdout_pred <- as.data.frame(predict(model4_level, newdata = data_holdout, interval="predict")) %>%
+  rename(pred_lwr = lwr, pred_upr = upr)
+predictionlev_holdout_conf <- as.data.frame(predict(model4_level, newdata = data_holdout, interval="confidence")) %>%
+  rename(conf_lwr = lwr, conf_upr = upr)
+
+predictionlev_holdout <- cbind(data_holdout[,c("price","distance")],
+                               predictionlev_holdout_pred,
+                               predictionlev_holdout_conf[,c("conf_lwr","conf_upr")])
+
+
+# Create data frame with the real and predicted values
+d <- data.frame(ylev=Ylev, predlev=predictionlev_holdout[,"fit"] )
+# Check the differences
+d$elev <- d$ylev - d$predlev
+
+# Plot predicted vs price
+level_vs_pred <- ggplot(data = d) +
+  geom_point(aes(y=ylev, x=predlev), color = color[1], size = 1,
+             shape = 16, alpha = 0.7, show.legend=FALSE, na.rm=TRUE) +
+  #geom_smooth(aes(y=ylev, x=predlev), method="lm", color=color[2], se=F, size=0.8, na.rm=T)+
+  geom_segment(aes(x = 0, y = 0, xend = 350, yend =350), size=0.5, color=color[2], linetype=2) +
+  coord_cartesian(xlim = c(0, 100), ylim = c(0, 100)) +
+  scale_x_continuous(expand = c(0.01,0.01),limits=c(0, 350), breaks=seq(0, 350, by=50)) +
+  scale_y_continuous(expand = c(0.01,0.01),limits=c(0, 350), breaks=seq(0, 350, by=50)) +
+  labs(y = "Price (US dollars)", x = "Predicted price  (US dollars)") +
+  theme_bg() 
+level_vs_pred
+
+###################
+## Random forest ##  LEFT OUT!!!!!
+###################
+# create train and holdout samples -------------------------------------------
+
+set.seed(1050)
+
+train_indices <- as.integer(createDataPartition(df$price_per_night, p = 0.7, list = FALSE))
+data_train <- df[train_indices, ]
+data_holdout <- df[-train_indices, ]
+
+dim(data_train)
+dim(data_holdout)
+
+
+# Basic Variables regarding distance and neighbourhood
+basic_vars <- c(  "distance", "neighbourhood")
+
+# reviews
+reviews <- c("number_of_reviews")
+
+
+# binaries
+binaries <- c("available_morethan_200", 'reviews_morethan_100', "distance_morethan_15", "good_neighbourhood")
+
+predictors_1 <- c(basic_vars)
+predictors_2 <- c(basic_vars, reviews, binaries)
+
+# do 5-fold CV
+train_control <- trainControl(method = "cv",
+                              number = 5,
+                              verboseIter = FALSE)
+
+
+# set tuning
+tune_grid <- expand.grid(
+  .mtry = c(1, 2),
+  .splitrule = "variance",
+  .min.node.size = c(2, 4)
+)
+
+
+# simpler model for model A (1)
+set.seed(1050)
+system.time({
+  rf_model_1 <- train(
+    formula(paste0("price ~", paste0(predictors_1, collapse = " + "))),
+    data = data_train,
+    method = "ranger",
+    trControl = train_control,
+    tuneGrid = tune_grid,
+    importance = "impurity"
+  )
+})
+rf_model_1
+
+# set tuning for benchamrk model (2)
+tune_grid <- expand.grid(
+  .mtry = c(1, 2),
+  .splitrule = "variance",
+  .min.node.size = c(1, 3)
+)
+
+set.seed(1050)
+system.time({
+  rf_model_2 <- train(
+    formula(paste0("price ~", paste0(predictors_2, collapse = " + "))),
+    data = data_train,
+    method = "ranger",
+    trControl = train_control,
+    tuneGrid = tune_grid,
+    importance = "impurity"
+  )
+})
+
+rf_model_2
+
+
+results <- resamples(
+  list(
+    model_1  = rf_model_1,
+    model_2  = rf_model_2
+    
+  )
+)
+summary(results)
+
+
+# Save outputs -------------------------------------------------------
+
+# Show Model B rmse shown with all the combinations
+rf_tuning_modelB <- rf_model_2$results %>%
+  dplyr::select(mtry, min.node.size, RMSE) %>%
+  dplyr::rename(nodes = min.node.size) %>%
+  spread(key = mtry, value = RMSE)
+
+kable(x = rf_tuning_modelB, format = "latex", digits = 2, caption = "CV RMSE") %>%
+  add_header_above(c(" ", "vars" = 3)) %>%
+  cat(.,file= paste0(dir, "/output/foresttest.tex"))
+
+      
+# Turning parameter choice 1
+result_1 <- matrix(c(
+  rf_model_1$finalModel$mtry,
+  rf_model_2$finalModel$mtry,
+  rf_model_1$finalModel$min.node.size,
+  rf_model_2$finalModel$min.node.size
+  
+),
+nrow=2, ncol=2,
+dimnames = list(c("Model A", "Model B"),
+                c("Min vars","Min nodes"))
+)
+kable(x = result_1, format = "latex", digits = 3) %>%
+  cat(.,file= paste0(dir, "/output/foresttest2.tex"))
+
+```
+
+## Introduction
+
+The aim of this analysis to determine a potential price for a company operating small and mid-size apartments hosting 2 to 6 guests. The company would like to  have an insight for the current prices on the market for which an airbnb dataset was implemented located in Austin, Texas [Link for Austin dataset](http://insideairbnb.com/get-the-data.html). The data was collected on 18th of December in 2020 that may influence the analysis deeply considering the current pandemic situation.
+During the analysis, there will be a brief description of variable handling and preparations including the classification and cleaning that will be followed by the creation of different predicting models. In order to check the external validity of the prediction models, a cross validation will be implemented. In the end, a diagnostic will be implemented to test whether the chosen model is better than the second best model or it is over-fitted.
+
 
 ## Variables:
 
+To begin with, in order to determine the predicted values, in this case the prices, several descriptive variables were applied. Only those data are considered that are for apartments. In the following section, these variables detailed how they were cleaned and handled. In the below histograms, the cleaned variables are presented for the following section.
 
-### Cleaning:
 
 
-### Feature Engineering:
+```{r, echo = FALSE , results = "asis", warning = FALSE, message = FALSE, out.width = "50%"}
+b1
+b2
+b3
+b4
+```
+```{r, echo = FALSE , results = "asis", warning = FALSE, message = FALSE, out.width = "50%", fig.align =  "center"}
+b5
+```
 
-You can also embed plots, for example:
+### Prices:
+As the prices (i.e. measured in USD) are the main focus of the prediction, all of the extreme values were dropped such as in cases where it equaled to one. However, in the original dataset, the prices were given for minimum days of renting, therefore they were divided by them to get an average daily prices for later uses. Also, when the price per night exceeded USD 150, they were excluded. They were considered as extreme values after determining the the 3rd quartile is at approximately USD 150 which will include 75% of the prices. Also, the analysis checked for potential log transformation but after the skewness is not high indicating not a long right tail, it was decided to use level models. It will also make the model implementations meaningful.
 
-```{r pressure, echo=FALSE}
+
+```{r, echo = FALSE , results = "asis", warning = FALSE, message = FALSE, include=TRUE}
+
+kable(xtb2)
 
 ```
 
+
+### Distance:
+The distance were not given in the original dataset, therefore it was calculated by the longitudes and latitudes of the listings. It measures the distance from the city center in kilometers. After checking a basic correlation between the prices and distance, it was determined that until 15 km, the prices decrease but after that, they follow an increasing pattern. Therefore, a binary variable was created which give 1 if it is closer than 15 km and 0 if not. As you can see on the below table that on average, the distance is around 7 km.
+
+```{r, echo = FALSE , results = "asis", warning = FALSE, message = FALSE, out.width = "50%", fig.align =  "center"}
+cp2
+```
+
+### Reviews:
+There are two different variable for review measurement, they are the number of reviews and reviews per month. They are considered a potentially good descriptive values but due to the high number of reviews per month, it might contain some risk in the analysis. On the other hand, in order to see how the number of reviews may influence the predicted price, a binary variable was created which gives 1 if it exceeds 100 and 0 otherwise. In the dataset, the reviews are around 11 as the median also suggests.
+
+### Neighbourhood:
+The neighborhood variables measures the districts of Austin. The correlation between the neighbourhood and prices shows a significant change after 78740 that can be explained by not only a potentially bad area but also the distance from the city center. Therefore, another binary was created which gives 1 if it is greater than 87740 and 0 if not.
+
+### Availability:
+As the final main variable that was used for the analysis is the availability of the apartments in a year. Because it measures in days for only one year, those were dropped which equaled to zero or exceeded 365. Furthermore, after checking the basic descriptives and the correlation of the availability, a final binary variable was determined that is 1 if exceeds 200 days, otherwise, it is zero. By this, the company can see how the availability may influence the pricing.
+
+```{r, echo = FALSE , results = "asis", warning = FALSE, message = FALSE, include=TRUE}
+xtb <- xtable(summary_table, type = latex, caption = "Summary statistics for descriptive numeric variables")
+kable(xtb)
+
+```
+
+
+
 ## Prediction Model
+The main focus of the prediction model to determine a potential price for the company when they enter the new apartments on the market. However, the prediction analysis contains significant risks that may end in disaster. The model may not capture all of the values which is measured by the prediction error. Therefore, one of the main focus of the model choice is based on the RMSE (i.e. root of Mean Squared Error) that is an indicator of loss functions. The MSE defines the mean value for the best predictor. The lower the value the better. On the other hand, the risk of over-fitting also stands for the analysis, therefore after choosing the models, a cross-validation is implemented to check external validity.
 
+### Lasso
+The LASSO is a regression analysis method that performs both variable selection and regularization in order to enhance the prediction accuracy and interpretability of the resulting statistical model. This method was used to determine which variables are better for the analysis.
 
+### Models and Cross Validation
+For the main part of the analysis, 4 models were created. The first one only includes the distance as a descriptive variable, the second adds the neighbourhood and availability, the third the number of reviews and reviews per month and the final also includes all of the binary variables. As it was mentioned, these variables were chosen based on the Lasso. After defining the models, in order to choose the best one, a 5-fold cross validation, in which the holdout set was 30% of the whole dataset, was implemented which resulted in the following outcomes:
 
-### Cross Validation
+```{r, echo = FALSE , results = "asis", warning = FALSE, message = FALSE, include=TRUE}
+xtb3 <- xtable(t1, type = latex, caption = "Models")
+kable(xtb3)
 
+```
 
+Cross-validation is a model validation techniques for assessing how the results of a statistical analysis will generalize to an independent data set. By this, the risk of over-fitting can be evaluated and the the potentially best model can be picked for prediction. Based on the RMSE values and BIC (i.e. a criterion for model selection among a finite set of models), the third model can be picked as the potentially best model. The decision is based on that the RMSE do not differ significantly between the test and holdout set, however, this BIC is a little bit lower than the BIC of the forth model that may indicate a higher risk of bad prediction. In other words, the lower the RMSE and BIC the better, so, if the RMSE of the training set exceeds the holdout set RMSE, it may indicate a over-fitted model.
 
-### Random Forest
-
+## Diagnostics
+Although assuming that the third model is the best model for prediction, a final diagnostics were implemented to compare it to the fourth model. It turned out that both models are over-fitted considering the fact that both holdout RMSEs were around 30 while the working set were approximately RMSEs 28,2. But, because the diagnostics outcomes do not differ from each other significantly, the original model is a better choice.
 
 
 ## Summary and Suggestions
+The main focus of the analysis was to determine a model for predicting a price for apartments that can accommodate from 2 to 6 people offer by a company. For the analysis, an airbnb dataset was sed from Austin, Texas. It was determined which variable interaction would work the best with Lasso. By this, four model was created from which the third with a total of 4 descriptive variables was chosen after determining the external validity with cross-validation. It turned out that a model is over-fitted by but significantly after implementing a diagnostics.
+
+###### Github Repository:
+The code availale in the following link: [Github](https://github.com/DiamantEszter97/CEU-Data-Analysis-3-Assignments)

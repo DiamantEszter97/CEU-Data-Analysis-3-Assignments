@@ -82,8 +82,10 @@ df <- df %>%  filter(price > 1)
 # create price_per_night column:
 df <- df %>%  mutate(price_per_night = price/minimum_nights)
 
+summary(df$price_per_night)
+
 # remove extreme values where price_per_night is over 200
-df <- df %>% filter(price_per_night < 100)
+df <- df %>% filter(price_per_night < 150)
 
 # check again price_per_night based on distance:
 # check price based on distance:
@@ -157,12 +159,17 @@ b4 <- ggplot(df, aes(x=minimum_nights)) +
   ylim(c(0,120)) +
   theme_bw()
 
+b5 <- ggplot(df, aes(x=price_per_night)) +
+  geom_histogram(color = "mintcream", fill = "cornflowerblue")  +
+  labs(x = "Price per night",y = "Count") +
+  xlim(c(1,150))  +
+  theme_bw()
+
 s4 <- summary(df$minimum_nights)
 
 
-summary_list <- c(s1, s2, s3, s4)
-summary_table <- c()
-summary_table <- t(cbind(summary_list))
+summary_table <- data.frame()
+summary_table <- rbind(s1, s2, s3, s4)
 rownames(summary_table) <- c("Distance", "Days available in one year", "Number of reviews", "Minumum Nights for rent")
 
 

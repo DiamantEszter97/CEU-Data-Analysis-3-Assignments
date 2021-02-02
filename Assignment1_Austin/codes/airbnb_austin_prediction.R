@@ -43,6 +43,12 @@ create_output_if_doesnt_exist(output)
 options(digits = 3)
 
 
+##########################################
+# DATA PEPARATION
+
+
+###########################################
+# PREDICTION
 
 # load dataframe:
 austin_df <- read_csv("https://raw.githubusercontent.com/DiamantEszter97/CEU-Data-Analysis-3-Assignments/main/Assignment1_Austin/data/clean/austin_cleaned.csv")
@@ -74,7 +80,6 @@ g3a <- ggplot(data=df, aes(x=price)) +
   scale_y_continuous(expand = c(0.00,0.00),limits=c(0, 0.15), breaks = seq(0, 0.15, by = 0.03), labels = scales::percent_format(1)) +
   scale_x_continuous(expand = c(0.00,0.00),limits=c(10,100), breaks = seq(0,400, 50)) +
   theme_bg() 
-g3a
 
 
 g3b<- ggplot(data=df, aes(x=ln_price)) +
@@ -105,7 +110,7 @@ g4
 #####################
 
 # Basic Variables
-basic_lev  <- c("distance", "neighbourhood", "availability_365")
+basic_lev  <- c("neighbourhood", "availability_365")
 
 # reviews
 reviews <- c("number_of_reviews","reviews_per_month")
@@ -126,7 +131,7 @@ g_interactions <- plot_grid(p1, p2, nrow=1, ncol=2)
 g_interactions
 
 
-# Create models in levels models: 1-8
+# Create models in levels models: 1-4
 modellev1 <- " ~ distance"
 modellev2 <- paste0(" ~ ",paste(basic_lev,collapse = " + "))
 modellev3 <- paste0(" ~ ",paste(c(basic_lev,reviews),collapse = " + "))
@@ -233,7 +238,7 @@ column_names <- c("Model", "N predictors", "R-squared", "BIC", "Training RMSE",
 t14_2 <- t1 %>%
   select("model_pretty_name", "nvars", "r2" , "BIC", "rmse_train", "rmse_test")
 colnames(t14_2) <- column_names
-print(xtable(t14_2, type = "latex", digits=c(0,0,0,2,0,2,2)), file = paste0(dir, "/output/modellev.tex"),
+print(xtable(t14_2, type = "latex", digits=c(0,0,0,2,0,2,2)), file = paste0(dir, "/output/modellev.html"),
       include.rownames=FALSE, booktabs=TRUE, floating = FALSE)
 
 
@@ -332,7 +337,7 @@ level_vs_pred <- ggplot(data = d) +
 level_vs_pred
 
 ###################
-## Random forest ##
+## Random forest ##  LEFT OUT!!!!!
 ###################
 # create train and holdout samples -------------------------------------------
 

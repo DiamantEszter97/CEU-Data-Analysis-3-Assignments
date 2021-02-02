@@ -91,11 +91,11 @@ g3b
 ## Boxplot of price by room type
 g4 <- ggplot(data = df, aes(x = room_type, y = price)) +
   stat_boxplot(aes(group = room_type), geom = "errorbar", width = 0.3,
-               color = c(color[2],color[1], color[3]), size = 0.5, na.rm=T)+
+               color = c(color[2]), size = 0.5, na.rm=T)+
   geom_boxplot(aes(group = room_type),
-               color = c(color[2],color[1], color[3]), fill = c(color[2],color[1], color[3]),
+               color = c(color[2]), fill = c(color[2]),
                size = 0.5, width = 0.6, alpha = 0.3, na.rm=T, outlier.shape = NA) +
-  scale_y_continuous(expand = c(0.01,0.01),limits = c(0,100), breaks = seq(0,300,100)) +
+  scale_y_continuous(expand = c(0.01,0.01),limits = c(0,100), breaks = seq(0,100,20)) +
   labs(x = "Room type",y = "Price (US dollars)")+
   theme_bg()
 g4
@@ -120,7 +120,7 @@ binaries <- c("available_morethan_200", 'reviews_morethan_100', "distance_moreth
 
 #Look up room type interactions
 p1 <- price_diff_by_variables2(df, "distance", "distance_morethan_15", "number_of_reviews", "reviews_morethan_100")
-p2 <- price_diff_by_variables2(df, "availability_365", "available_morethan_200", "distance", "distance_morethan_15")
+p2 <- price_diff_by_variables2(df, "availability_365", "available_morethan_200", "neighborhood", "good_neighbourhood")
 
 g_interactions <- plot_grid(p1, p2, nrow=1, ncol=2)
 g_interactions
@@ -247,6 +247,10 @@ t1_levels <- t1 %>%
                       labels = c("RMSE Training","RMSE Test")))
 
 t1_levels
+test_table <- c()
+test_table <- cbind(t1_levels)
+
+test_table
 
 model_result_plot_levels <- ggplot(data = t1_levels,
                                    aes(x = factor(nvars2), y = value, color=factor(var), group = var)) +
@@ -257,6 +261,7 @@ model_result_plot_levels <- ggplot(data = t1_levels,
   scale_x_discrete( name = "Number of coefficients", expand=c(0.01, 0.01)) +
   geom_dl(aes(label = var),  method = list("last.points", dl.trans(x=x-1), cex=0.4))
   #scale_colour_discrete(guide = 'none') 
+
 model_result_plot_levels
 
 
@@ -345,7 +350,7 @@ dim(data_holdout)
 basic_vars <- c(  "distance", "neighbourhood")
 
 # reviews
-reviews <- c("number_of_reviews", "reviews_per_month")
+reviews <- c("number_of_reviews")
 
 
 # binaries
@@ -431,32 +436,29 @@ kable(x = rf_tuning_modelB, format = "latex", digits = 2, caption = "CV RMSE") %
 result_1 <- matrix(c(
   rf_model_1$finalModel$mtry,
   rf_model_2$finalModel$mtry,
-  rf_model_2auto$finalModel$mtry,
   rf_model_1$finalModel$min.node.size,
-  rf_model_2$finalModel$min.node.size,
-  rf_model_2auto$finalModel$min.node.size
+  rf_model_2$finalModel$min.node.size
   
 ),
-nrow=3, ncol=2,
-dimnames = list(c("Model A", "Model B","Model B auto"),
+nrow=2, ncol=2,
+dimnames = list(c("Model A", "Model B"),
                 c("Min vars","Min nodes"))
 )
 kable(x = result_1, format = "latex", digits = 3) %>%
-  cat(.,file= paste0(dir, "/output/foresttest.tex"))
+  cat(.,file= paste0(dir, "/output/foresttest2.tex"))
 
 # Turning parameter choice 2
 result_2 <- matrix(c(mean(results$values$`model_1~RMSE`),
-                     mean(results$values$`model_2~RMSE`),
-                     mean(results$values$`model_2b~RMSE`)
+                     mean(results$values$`model_2~RMSE`)
 ),
-nrow=3, ncol=1,
-dimnames = list(c("Model A", "Model B","Model B auto"),
+nrow=2, ncol=2,
+dimnames = list(c("Model A", "Model B"),
                 c(results$metrics[2]))
 )
 
 
 kable(x = result_2, format = "latex", digits = 3) %>%
-  cat(.,file= paste0(dir, "/output/foresttest.tex"))
+  cat(.,file= paste0(dir, "/output/foresttest3.tex"))
 
 
 

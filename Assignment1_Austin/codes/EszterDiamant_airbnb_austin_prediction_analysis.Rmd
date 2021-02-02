@@ -1,0 +1,92 @@
+---
+title: "Airbnb_Austin_PredictionAnalysis"
+author: "Eszter Diamant"
+date: '2021 02 02 '
+output:  
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+
+library(rattle)
+library(tidyverse)
+library(caret)
+library(ranger)
+library(Hmisc)
+library(knitr)
+library(kableExtra)
+library(xtable)
+library(skimr)
+library(grid)
+library(glmnet)
+library(stargazer)
+library(directlabels)
+library(cowplot)
+library(dplyr)
+library(ggplot2)
+
+```
+
+## Introduction
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r, echo = FALSE , results = "asis", warning = FALSE, message = FALSE, include=FALSE}
+dir <- "C:/Users/diama/Documents/CEU-BA-Assignments/CEU-Data-Analysis-3-Assignments/Assignment1_Austin"
+setwd("c:/Users/diama/Documents/CEU-Business-Analytics-2020/Data_Analysis3/class_material/da_case_studies/")
+
+# option A: open material as project
+# option B: set working directory for da_case_studies
+#           example: setwd("C:/Users/bekes.gabor/Documents/github/da_case_studies/")
+
+# set data dir, load theme and functions
+source("ch00-tech-prep/theme_bg.R")
+source("ch00-tech-prep/da_helper_functions.R")
+
+# data used
+source("set-data-directory.R") #data_dir must be first defined #
+data_dir <- "c:/Users/diama/Documents/CEU-Business-Analytics-2020/Data_Analysis3/class_material/da_data_repo/"
+data_in <- paste(data_dir,"airbnb","clean/", sep = "/")
+
+use_case_dir <- "ch14-airbnb-reg/"
+data_out <- use_case_dir
+output <- paste0(use_case_dir,"output/")
+create_output_if_doesnt_exist(output)
+
+options(digits = 3)
+
+```
+
+## Variables:
+
+
+### Cleaning:
+
+
+### Feature Engineering:
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+
+```
+
+## Prediction Model
+
+
+
+### Cross Validation
+
+
+
+### Random Forest
+
+
+
+## Summary and Suggestions

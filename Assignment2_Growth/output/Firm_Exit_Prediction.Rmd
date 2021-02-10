@@ -1,0 +1,309 @@
+---
+title: "Firm Exit Prediction"
+author: "Eszter Diamant"
+date: '2021 02 10 '
+output: 
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+library(haven)
+library(glmnet)
+library(purrr)
+library(margins)
+library(skimr)
+library(kableExtra)
+library(Hmisc)
+library(cowplot)
+library(gmodels) 
+library(lspline)
+library(sandwich)
+library(modelsummary)
+
+library(rattle)
+library(caret)
+library(pROC)
+library(ranger)
+library(rpart)
+library(partykit)
+library(rpart.plot)
+library(stats)
+library(dplyr)
+library(randomForest)
+
+
+
+
+# set working environment
+setwd("c:/Users/diama/Documents/CEU-Business-Analytics-2020/Data_Analysis3/class_material/da_case_studies/")
+
+# for output:
+output <- "C:/Users/diama/Documents/CEU-BA-Assignments/CEU-Data-Analysis-3-Assignments/Assignment2_Deafults/output/"
+
+# set data dir, load theme and functions
+source("ch00-tech-prep/theme_bg.R")
+source("ch00-tech-prep/da_helper_functions.R")
+
+# data used
+source("set-data-directory.R") #data_dir must be first defined #
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r, echo = FALSE , results = "asis", warning = FALSE, message = FALSE, include=FALSE}
+######################
+# load data:
+first_df <-read_rds(("C:/Users/diama/Documents/CEU-BA-Assignments/CEU-Data-Analysis-3-Assignments/Assignment2_Deafults/data/clean/bisnode_firms_clean.rds"))
+
+# save it to another dataframe to avoid long data loading
+df <- first_df
+
+#summary
+skim(df)
+
+############################
+# simple multiple regression
+
+# Define variable sets ----------------------------------------------
+# (making sure we use ind2_cat, which is a factor)
+
+rawvars <-  c("curr_assets", "curr_liab", "extra_exp", "extra_inc", "extra_profit_loss", "fixed_assets",
+              "inc_bef_tax", "intang_assets", "inventories", "liq_assets", "material_exp", "personnel_exp",
+              "profit_loss_year", "sales", "share_eq", "subscribed_cap")
+
+qualityvars <- c("balsheet_flag", "balsheet_length", "balsheet_notfullyear")
+
+engvar <- c("total_assets_bs", "fixed_assets_bs", "liq_assets_bs", "curr_assets_bs",
+            "share_eq_bs", "subscribed_cap_bs", "intang_assets_bs", "extra_exp_pl",
+            "extra_inc_pl", "extra_profit_loss_pl", "inc_bef_tax_pl", "inventories_pl",
+            "material_exp_pl", "profit_loss_year_pl", "personnel_exp_pl")
+
+engvar2 <- c("extra_profit_loss_pl_quad", "inc_bef_tax_pl_quad",
+             "profit_loss_year_pl_quad", "share_eq_bs_quad")
+
+engvar3 <- c(grep("*flag_low$", names(df), value = TRUE),
+             grep("*flag_high$", names(df), value = TRUE),
+             grep("*flag_error$", names(df), value = TRUE),
+             grep("*flag_zero$", names(df), value = TRUE))
+
+d1 <-  c("d1_sales_mil_log_mod", "d1_sales_mil_log_mod_sq",
+         "flag_low_d1_sales_mil_log", "flag_high_d1_sales_mil_log")
+
+hr <- c("female", "ceo_age", "flag_high_ceo_age", "flag_low_ceo_age",
+        "flag_miss_ceo_age", "ceo_count", "labor_avg_mod",
+        "flag_miss_labor_avg", "foreign_management")
+
+firm <- c("age", "age2", "new", "ind2_cat", "m_region_loc", "urban_m")
+
+reg1 <- lm(formula(paste0("default ~", paste0(rawvars, collapse = " + "))),
+                  data = df)
+
+m <- margins(reg1, vce = "none")
+
+reg1_table <- summary(reg1) %>%
+  coef() %>%
+  as.data.frame() %>%
+  select(Estimate, `Std. Error`) %>%
+  mutate(factor = row.names(.)) %>%
+  merge(summary(m)[,c("factor","AME")])
+
+reg1_glm <- glm(formula(paste0("default ~", paste0(rawvars, collapse = " + "))),
+                  data = df)
+
+m <- margins(reg1_glm, vce = "none")
+
+glm_reg1_table <- summary(reg1_glm) %>%
+  coef() %>%
+  as.data.frame() %>%
+  select(Estimate, `Std. Error`) %>%
+  mutate(factor = row.names(.)) %>%
+  merge(summary(m)[,c("factor","AME")])
+
+
+#######################
+# logit 
+#######################
+
+
+# interactions for logit, LASSO
+interactions1 <- c("ind2_cat*age", "ind2_cat*age2",
+                   "ind2_cat*d1_sales_mil_log_mod", "ind2_cat*sales_mil_log",
+                   "ind2_cat*ceo_age", "ind2_cat*foreign_management",
+                   "ind2_cat*female",   "ind2_cat*urban_m", "ind2_cat*labor_avg_mod")
+interactions2 <- c("sales_mil_log*age", "sales_mil_log*female",
+                   "sales_mil_log*profit_loss_year_pl", "sales_mil_log*foreign_management")
+
+
+
+
+X1 <- c("sales_mil_log", "sales_mil_log_sq", "d1_sales_mil_log_mod", "profit_loss_year_pl", "ind2_cat")
+X2 <- c("sales_mil_log", "sales_mil_log_sq", "d1_sales_mil_log_mod", "profit_loss_year_pl", "fixed_assets_bs","share_eq_bs","curr_liab_bs ",   "curr_liab_bs_flag_high ", "curr_liab_bs_flag_error",  "age","foreign_management" , "ind2_cat")
+X3 <- c("sales_mil_log", "sales_mil_log_sq", firm, engvar,                   d1)
+X4 <- c("sales_mil_log", "sales_mil_log_sq", firm, engvar, engvar2, engvar3, d1, hr, qualityvars)
+X5 <- c("sales_mil_log", "sales_mil_log_sq", firm, engvar, engvar2, engvar3, d1, hr, qualityvars, interactions1, interactions2)
+
+# for LASSO
+logitvars <- c("sales_mil_log", "sales_mil_log_sq", engvar, engvar2, engvar3, d1, hr, firm, qualityvars, interactions1, interactions2)
+
+# for RF (no interactions, no modified features)
+rfvars  <-  c("sales_mil", "d1_sales_mil_log", rawvars, hr, firm, qualityvars)
+
+
+# Check simplest model X1
+ols_modelx1 <- lm(formula(paste0("default ~", paste0(X1, collapse = " + "))),
+                  data = df)
+
+
+glm_modelx1 <- glm(formula(paste0("default ~", paste0(X1, collapse = " + "))),
+                   data = df, family = "binomial")
+
+
+m <- margins(ols_modelx1, vce = "none")
+
+ols_table <- summary(ols_modelx1) %>%
+  coef() %>%
+  as.data.frame() %>%
+  select(Estimate, `Std. Error`) %>%
+  mutate(factor = row.names(.)) %>%
+  merge(summary(m)[,c("factor","AME")])
+
+
+m <- margins(glm_modelx1, vce = "none")
+
+glm_ols_table <- summary(glm_modelx1) %>%
+  coef() %>%
+  as.data.frame() %>%
+  select(Estimate, `Std. Error`) %>%
+  mutate(factor = row.names(.)) %>%
+  merge(summary(m)[,c("factor","AME")])
+
+
+#############################
+# Random Forest
+#############################
+
+
+# create training and holdaout set
+# create training and holdaout set
+set.seed(15000)
+lenght_t <- nrow(df)
+index <- rep(NA, lenght_t)
+index <- sample(2, lenght_t, replace = TRUE, prob = c(0.7, 0.3))
+training <- df[index ==1,]
+testing <- df[index ==2,]
+
+
+
+predictors_1 <- c(rawvars, firm)
+predictors_2 <- c(rawvars, firm, engvar, engvar2, hr)
+
+# do 5-fold CV
+train_control <- trainControl(method = "cv",
+                              number = 5,
+                              verboseIter = FALSE)
+
+
+# set tuning
+tune_grid <- expand.grid(
+  .mtry = c(1, 2),
+  .splitrule = "variance",
+  .min.node.size = c(2, 4, 6)
+)
+
+
+# simpler model for model A (1)
+set.seed(15000)
+system.time({
+  rf_model_1 <- train(
+    formula(paste0("default ~", paste0(predictors_1, collapse = " + "))),
+    data = training,
+    method = "ranger",
+    trControl = train_control,
+    tuneGrid = tune_grid,
+    importance = "impurity"
+  )
+})
+rf_model_1
+
+
+# set tuning for benchamrk model (2)
+tune_grid <- expand.grid(
+  .mtry = c(1, 2),
+  .splitrule = "variance",
+  .min.node.size = c(2, 4, 6)
+)
+
+set.seed(1050)
+system.time({
+  rf_model_2 <- train(
+    formula(paste0("default ~", paste0(predictors_2, collapse = " + "))),
+    data = training,
+    method = "ranger",
+    trControl = train_control,
+    tuneGrid = tune_grid,
+    importance = "impurity"
+  )
+})
+
+
+# put findings into table
+results <- resamples(
+  list(
+    model_1  = rf_model_1,
+    model_2  = rf_model_2
+    
+  )
+)
+
+rf <- summary(results)
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r, echo = FALSE , results = "asis", warning = FALSE, message = FALSE}
+reg1_table %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = "striped", full_width = F, font_size = 10)
+
+glm_reg1_table %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = "striped", full_width = F, font_size = 10)
+
+
+ols_table %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = "striped", full_width = F, font_size = 10)
+
+glm_ols_table %>%
+  kbl() %>% 
+  kable_styling(bootstrap_options = "striped", full_width = F, font_size = 10)
+
+```
+
+```{r, echo = FALSE}
+
+
+```
+
+
+```{r, echo = FALSE , results = "asis", warning = FALSE, message = FALSE, out.width = "30%"}
+
+
+```
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

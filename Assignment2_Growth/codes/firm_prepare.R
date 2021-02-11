@@ -35,7 +35,7 @@ source("set-data-directory.R") #data_dir must be first defined #
 
 ######################
 # load data:
-first_df <- read_csv("https://raw.githubusercontent.com/DiamantEszter97/CEU-Data-Analysis-3-Assignments/main/Assignment2_Deafults/data/clean/cs_bisnode_panel.csv")
+first_df <- read_csv("https://raw.githubusercontent.com/DiamantEszter97/CEU-Data-Analysis-3-Assignments/main/Assignment2_Growth/data/clean/cs_bisnode_panel.csv")
 
 
 
@@ -61,20 +61,11 @@ df  <- df %>%
   mutate(status_alive = sales > 0 & !is.na(sales) %>%
            as.numeric(.))
 
-# defaults in two years if there are sales in this year but no sales two years later
-df <- df %>%
-  group_by(comp_id) %>%
-  mutate(default = ((status_alive == 1) & (lead(status_alive, 2) == 0)) %>%
-           as.numeric(.)) %>%
-  ungroup()
 
-# filter out until 2014:
-df <- df %>%
-  filter(year <=2014)
 
-# Size and growth
-summary(df$profit_loss_year) # There will be NAs, we'll drop them soon
-skim(df$profit_loss_year)
+# filter out from 2012 until 2014 
+df <- df %>%
+  filter((year <=2014) & (year >= 2012))
 
 
 # if sales less than 0, it is set to 1, otherwise it stays as it is. 
@@ -86,8 +77,14 @@ df <- df %>%
          ln_sales = ifelse(sales > 0, log(sales), 0),
          sales_mil=sales/1000000,
          sales_mil_log = ifelse(sales > 0, log(sales_mil), 0),
-         profit_loss_year_log = ifelse(profit_loss_year > 1, log(profit_loss_year), 0),
-         sales_growth = ifelse(profit_loss_year<=0, 0, 1))
+         profit_loss_year_log = ifelse(profit_loss_year > 1, log(profit_loss_year), 0))
+
+#¦ calculate growth rate
+df <- df %>%
+  group_by(comp_id) %>%
+  mutate(tot_growth = ((sales_mil - Lag(sales_mil, -1))/100) ) %>%
+  ungroup()
+
 
 # calculates million sales log minus where it is missing value set to 1
 df <- df %>%
@@ -108,12 +105,26 @@ df <- df %>%
 
 # look at cross section
 df <- df %>%
-  filter((year >= 2012) & (year <= 2014) & (status_alive == 1)) %>%
+  filter(status_alive == 1) %>%
   # look at firms below 10m euro revenues and above 1000 euros
   filter(!(sales_mil > 10)) %>%
   filter(!(sales_mil < 0.001))
 
-Hmisc::describe(df$sales_growth)
+
+# check for sales_growth
+Hmisc::describe(df$tot_growth)
+
+# due to high number of missing value due to the calculation between 2012 and 2014, it is filtered for 2013 and 2014
+df <-  df %>% filter(year > 2012)
+
+# only 2731 are missing values, they are corrected for mean values
+des <- Hmisc::describe(df$tot_growth)
+mean_tot <- des$counts[5]
+df <- df %>% mutate(tot_growth = ifelse(is.na(tot_growth), mean_tot, tot_growth))
+
+#• if the growth is higher than 0,3, it is considered as high. high is 1, otherwise 0:
+df <- df %>%
+  mutate(sales_growth = ifelse(tot_growth > 0.3, 1, 0))
 
 
 ###########################################################
@@ -245,7 +256,7 @@ df <- df %>%
 
 df <- df %>%
   mutate(sales_growth_f = factor(sales_growth, levels = c(0,1)) %>%
-           recode(., `0` = 'no_growth', `1` = "growth"))
+           recode(., `0` = 'no_high_growth', `1` = "high_growth"))
 
 
 ########################################################################
@@ -316,9 +327,39 @@ df <- df %>%
 ggplot(data = df, aes(x=d1_sales_mil_log_mod, y=as.numeric(sales_growth))) +
   geom_point(size=2,  shape=20, stroke=2, fill="blue", color="blue") +
   geom_smooth(method="loess", se=F, colour="black", size=1.5, span=0.9) +
-  labs(x = "d1_sales_mil_log_mod",y = "default") +
+  labs(x = "d1_sales_mil_log_mod",y = "sales growth") +
   theme_bg() +
   scale_x_continuous(limits = c(-1.5,1.5), breaks = seq(-1.5,1.5, 0.5))
+
+
+######################
+### with current assets and liabilities
+
+
+ggplot(data = df, aes(x=log(curr_assets), y=as.numeric(sales_growth))) +
+  geom_point(size=2,  shape=20, stroke=2, fill="blue", color="blue") +
+  geom_smooth(method="loess", se=F, colour="black", size=1.5, span=0.9) +
+  labs(x = "currents assets",y = "sales growth") +
+  theme_bg() 
+
+ggplot(data = df, aes(x=log(curr_liab), y=as.numeric(sales_growth))) +
+  geom_point(size=2,  shape=20, stroke=2, fill="blue", color="blue") +
+  geom_smooth(method="loess", se=F, colour="black", size=1.5, span=0.9) +
+  labs(x = "currents liabilities",y = "sales growth") +
+  theme_bg() 
+
+# add log_liab and log_ass to the df
+
+df <- df %>% mutate(curr_assets_log = log(curr_assets),
+                    curr_liab_log = log(curr_liab))
+
+df <- df %>% filter(!is.infinite(df$curr_liab_log) & (!is.infinite(df$curr_assets_log)) & (!is.na(curr_liab_log)))
+
+# check for basic regression between assets and liabilities
+ols_bs <- lm(sales_growth~curr_assets_log+curr_liab_log,
+            data = df)
+
+summary(ols_bs)
 
 # check variables
 skimr::skim(df)

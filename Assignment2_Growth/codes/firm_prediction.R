@@ -29,7 +29,7 @@ library(randomForest)
 setwd("c:/Users/diama/Documents/CEU-Business-Analytics-2020/Data_Analysis3/class_material/da_case_studies/")
 
 # for output:
-output <- "C:/Users/diama/Documents/CEU-BA-Assignments/CEU-Data-Analysis-3-Assignments/Assignment2_Deafults/output/"
+output <- "C:/Users/diama/Documents/CEU-BA-Assignments/CEU-Data-Analysis-3-Assignments/Assignment2_Growth/output/"
 
 # set data dir, load theme and functions
 source("ch00-tech-prep/theme_bg.R")
@@ -40,7 +40,7 @@ source("set-data-directory.R") #data_dir must be first defined #
 
 ######################
 # load data:
-first_df <-read_rds(("C:/Users/diama/Documents/CEU-BA-Assignments/CEU-Data-Analysis-3-Assignments/Assignment2_Deafults/data/clean/bisnode_firms_clean.rds"))
+first_df <-read_rds(("C:/Users/diama/Documents/CEU-BA-Assignments/CEU-Data-Analysis-3-Assignments/Assignment2_Growth/data/clean/bisnode_firms_clean.rds"))
 
 # save it to another dataframe to avoid long data loading
 df <- first_df
@@ -82,7 +82,7 @@ hr <- c("female", "ceo_age", "flag_high_ceo_age", "flag_low_ceo_age",
 
 firm <- c("age", "age2", "new", "ind2_cat", "m_region_loc", "urban_m")
 
-reg1 <- lm(formula(paste0("default ~", paste0(rawvars, collapse = " + "))),
+reg1 <- lm(formula(paste0("sales_growth ~", paste0(rawvars, collapse = " + "))),
            data = df)
 
 m <- margins(reg1, vce = "none")
@@ -94,7 +94,7 @@ reg1_table <- summary(reg1) %>%
   mutate(factor = row.names(.)) %>%
   merge(summary(m)[,c("factor","AME")])
 
-reg1_glm <- glm(formula(paste0("default ~", paste0(rawvars, collapse = " + "))),
+reg1_glm <- glm(formula(paste0("sales_growth ~", paste0(rawvars, collapse = " + "))),
                 data = df)
 
 m <- margins(reg1_glm, vce = "none")
@@ -137,11 +137,11 @@ rfvars  <-  c("sales_mil", "d1_sales_mil_log", rawvars, hr, firm, qualityvars)
 
 
 # Check simplest model X1
-ols_modelx1 <- lm(formula(paste0("default ~", paste0(X1, collapse = " + "))),
+ols_modelx1 <- lm(formula(paste0("sales_growth ~", paste0(X1, collapse = " + "))),
                   data = df)
 
 
-glm_modelx1 <- glm(formula(paste0("default ~", paste0(X1, collapse = " + "))),
+glm_modelx1 <- glm(formula(paste0("sales_growth ~", paste0(X1, collapse = " + "))),
                    data = df, family = "binomial")
 
 
@@ -202,7 +202,7 @@ tune_grid <- expand.grid(
 set.seed(15000)
 system.time({
   rf_model_1 <- train(
-    formula(paste0("default ~", paste0(predictors_1, collapse = " + "))),
+    formula(paste0("sales_growth ~", paste0(predictors_1, collapse = " + "))),
     data = training,
     method = "ranger",
     trControl = train_control,
@@ -220,10 +220,10 @@ tune_grid <- expand.grid(
   .min.node.size = c(2, 4, 6)
 )
 
-set.seed(1050)
+set.seed(15000)
 system.time({
   rf_model_2 <- train(
-    formula(paste0("default ~", paste0(predictors_2, collapse = " + "))),
+    formula(paste0("sales_growth ~", paste0(predictors_2, collapse = " + "))),
     data = training,
     method = "ranger",
     trControl = train_control,
@@ -244,7 +244,7 @@ results <- resamples(
 
 rf <- summary(results)
 
-
+rf
 
 
 
@@ -274,9 +274,9 @@ for (model_name in names(logit_model_vars)) {
   
   features <- logit_model_vars[[model_name]]
   
-  set.seed(13505)
+  set.seed(15000)
   glm_model <- train(
-    formula(paste0("default_f ~", paste0(features, collapse = " + "))),
+    formula(paste0("sales_growth_f ~", paste0(features, collapse = " + "))),
     method = "glm",
     data = training,
     family = binomial,
@@ -289,6 +289,8 @@ for (model_name in names(logit_model_vars)) {
   
 }
 
+
+CV_RMSE_folds
 # Logit lasso -----------------------------------------------------------
 
 lambda <- 10^seq(-1, -4, length = 10)
@@ -297,8 +299,8 @@ grid <- expand.grid("alpha" = 1, lambda = lambda)
 set.seed(15000)
 system.time({
   logit_lasso_model <- train(
-    formula(paste0("default_f ~", paste0(logitvars, collapse = " + "))),
-    data = data_train,
+    formula(paste0("sales_growth_f ~", paste0(logitvars, collapse = " + "))),
+    data = training,
     method = "glmnet",
     preProcess = c("center", "scale"),
     family = "binomial",
@@ -316,6 +318,7 @@ write.csv(lasso_coeffs, paste0(output, "lasso_logit_coeffs.csv"))
 
 CV_RMSE_folds[["LASSO"]] <- logit_lasso_model$resample[,c("Resample", "RMSE")]
 
+CV_RMSE_folds
 
 #############################################x
 # PART I
@@ -334,13 +337,15 @@ for (model_name in names(logit_models)) {
       model$pred %>%
       filter(Resample == fold)
     
-    roc_obj <- roc(cv_fold$obs, cv_fold$default)
+    roc_obj <- roc(cv_fold$obs, cv_fold$growth)
     auc[[fold]] <- as.numeric(roc_obj$auc)
   }
   
   CV_AUC_folds[[model_name]] <- data.frame("Resample" = names(auc),
                                            "AUC" = unlist(auc))
 }
+
+CV_AUC_folds
 
 # For each model: average RMSE and average AUC for models ----------------------------------
 
@@ -351,6 +356,9 @@ for (model_name in names(logit_models)) {
   CV_RMSE[[model_name]] <- mean(CV_RMSE_folds[[model_name]]$RMSE)
   CV_AUC[[model_name]] <- mean(CV_AUC_folds[[model_name]]$AUC)
 }
+
+CV_RMSE
+CV_AUC
 
 # We have 6 models, (5 logit and the logit lasso). For each we have a 5-CV RMSE and AUC.
 # We pick our preferred model based on that. -----------------------------------------------
@@ -368,27 +376,41 @@ kable(x = logit_summary1, format = "latex", booktabs=TRUE,  digits = 3, row.name
 
 # Take best model and estimate RMSE on holdout  -------------------------------------------
 
+##################
+# CHOOOOOOSE BEST LOGIT MODEL
+
 best_logit_no_loss <- logit_models[["X4"]]
 
-logit_predicted_probabilities_holdout <- predict(best_logit_no_loss, newdata = data_holdout, type = "prob")
-data_holdout[,"best_logit_no_loss_pred"] <- logit_predicted_probabilities_holdout[,"default"]
-RMSE(data_holdout[, "best_logit_no_loss_pred", drop=TRUE], data_holdout$default)
+logit_predicted_probabilities_holdout <- predict(best_logit_no_loss, newdata = testing, type = "prob")
+testing[,"best_logit_no_loss_pred"] <- logit_predicted_probabilities_holdout[,"growth"]
+RMSE(testing[, "best_logit_no_loss_pred", drop=TRUE], testing$sales_growth)
 
 # discrete ROC (with thresholds in steps) on holdout -------------------------------------------------
 thresholds <- seq(0.05, 0.75, by = 0.05)
+
+
+
+
+
+######################x
+### ÁTNÉZNI!!!!!!!!!!!!!
+####################
+
+
+
 
 cm <- list()
 true_positive_rates <- c()
 false_positive_rates <- c()
 for (thr in thresholds) {
-  holdout_prediction <- ifelse(data_holdout[,"best_logit_no_loss_pred"] < thr, "no_default", "default") %>%
-    factor(levels = c("no_default", "default"))
-  cm_thr <- confusionMatrix(holdout_prediction,data_holdout$default_f)$table
+  holdout_prediction <- ifelse(testing[,"best_logit_no_loss_pred"] < thr, "no_growth", "growth") %>%
+    factor(levels = c("no_growth", "growth"))
+  cm_thr <- confusionMatrix(holdout_prediction,testing$sales_growth_f)$table
   cm[[as.character(thr)]] <- cm_thr
-  true_positive_rates <- c(true_positive_rates, cm_thr["default", "default"] /
-                             (cm_thr["default", "default"] + cm_thr["no_default", "default"]))
-  false_positive_rates <- c(false_positive_rates, cm_thr["default", "no_default"] /
-                              (cm_thr["default", "no_default"] + cm_thr["no_default", "no_default"]))
+  true_positive_rates <- c(true_positive_rates, cm_thr["growth", "growth"] /
+                             (cm_thr["growth", "growth"] + cm_thr["no_growth", "growth"]))
+  false_positive_rates <- c(false_positive_rates, cm_thr["growth", "no_growth"] /
+                              (cm_thr["growth", "no_growth"] + cm_thr["no_growth", "no_growth"]))
 }
 
 tpr_fpr_for_thresholds <- tibble(
@@ -402,7 +424,6 @@ discrete_roc_plot <- ggplot(
   aes(x = false_positive_rate, y = true_positive_rate, color = threshold)) +
   labs(x = "False positive rate (1 - Specificity)", y = "True positive rate (Sensitivity)") +
   geom_point(size=2, alpha=0.8) +
-  scale_color_viridis(option = "D", direction = -1) +
   scale_x_continuous(expand = c(0.01,0.01), limit=c(0,1), breaks = seq(0,1,0.1)) +
   scale_y_continuous(expand = c(0.01,0.01), limit=c(0,1), breaks = seq(0,1,0.1)) +
   theme_bg() +
@@ -410,24 +431,25 @@ discrete_roc_plot <- ggplot(
   theme(legend.title = element_text(size = 4), 
         legend.text = element_text(size = 4),
         legend.key.size = unit(.4, "cm")) 
+
 discrete_roc_plot
-save_fig("ch17-figure-2a-roc-discrete", output, "small")
+
 
 # continuous ROC on holdout with best model (Logit 4) -------------------------------------------
 
-roc_obj_holdout <- roc(data_holdout$default, data_holdout$best_logit_no_loss_pred)
+roc_obj_holdout <- roc(testing$sales_growth, testing$best_logit_no_loss_pred)
 
 createRocPlot(roc_obj_holdout, "best_logit_no_loss_roc_plot_holdout")
 
 # Confusion table with different tresholds ----------------------------------------------------------
 
 # default: the threshold 0.5 is used to convert probabilities to binary classes
-logit_class_prediction <- predict(best_logit_no_loss, newdata = data_holdout)
+logit_class_prediction <- predict(best_logit_no_loss, newdata = testing)
 summary(logit_class_prediction)
 
 # confusion matrix: summarize different type of errors and successfully predicted cases
 # positive = "yes": explicitly specify the positive case
-cm_object1 <- confusionMatrix(logit_class_prediction, data_holdout$default_f, positive = "default")
+cm_object1 <- confusionMatrix(logit_class_prediction, testing$sales_growth_f, positive = "growth")
 cm1 <- cm_object1$table
 cm1
 
@@ -435,19 +457,19 @@ cm1
 
 # 0.5 same as before
 holdout_prediction <-
-  ifelse(data_holdout$best_logit_no_loss_pred < 0.5, "no_default", "default") %>%
-  factor(levels = c("no_default", "default"))
-cm_object1b <- confusionMatrix(holdout_prediction,data_holdout$default_f)
+  ifelse(testing$best_logit_no_loss_pred < 0.5, "growth", "no_growth") %>%
+  factor(levels = c("growth", "no_growth"))
+cm_object1b <- confusionMatrix(holdout_prediction,testing$sales_growth_f)
 cm1b <- cm_object1b$table
 cm1b
 
 # a sensible choice: mean of predicted probabilities
-mean_predicted_default_prob <- mean(data_holdout$best_logit_no_loss_pred)
+mean_predicted_default_prob <- mean(testing$best_logit_no_loss_pred)
 mean_predicted_default_prob
 holdout_prediction <-
-  ifelse(data_holdout$best_logit_no_loss_pred < mean_predicted_default_prob, "no_default", "default") %>%
-  factor(levels = c("no_default", "default"))
-cm_object2 <- confusionMatrix(holdout_prediction,data_holdout$default_f)
+  ifelse(testing$best_logit_no_loss_pred < mean_predicted_default_prob, "growth", "no_growth") %>%
+  factor(levels = c("growth", "no_growth"))
+cm_object2 <- confusionMatrix(holdout_prediction,testing$sales_growth_f)
 cm2 <- cm_object2$table
 cm2
 
@@ -455,16 +477,6 @@ cm2
 
 
 
-
-# Calibration curve -----------------------------------------------------------
-# how well do estimated vs actual event probabilities relate to each other?
-
-
-create_calibration_plot(data_holdout, 
-                        file_name = "ch17-figure-1-logit-m4-calibration", 
-                        prob_var = "best_logit_no_loss_pred", 
-                        actual_var = "default",
-                        n_bins = 10)
 
 
 #############################################x
@@ -478,7 +490,7 @@ FP=1
 FN=10
 cost = FN/FP
 # the prevalence, or the proportion of cases in the population (n.cases/(n.controls+n.cases))
-prevelance = sum(data_train$default)/length(data_train$default)
+prevelance = sum(training$sales_growth)/length(training$sales_growth)
 
 # Draw ROC Curve and find optimal threshold with loss function --------------------------
 
@@ -501,11 +513,11 @@ for (model_name in names(logit_models)) {
       model$pred %>%
       filter(Resample == fold)
     
-    roc_obj <- roc(cv_fold$obs, cv_fold$default)
+    roc_obj <- roc(cv_fold$obs, cv_fold$growth)
     best_treshold <- coords(roc_obj, "best", ret="all", transpose = FALSE,
                             best.method="youden", best.weights=c(cost, prevelance))
     best_tresholds_cv[[fold]] <- best_treshold$threshold
-    expected_loss_cv[[fold]] <- (best_treshold$fp*FP + best_treshold$fn*FN)/length(cv_fold$default)
+    expected_loss_cv[[fold]] <- (best_treshold$fp*FP + best_treshold$fn*FN)/length(cv_fold$sales_growth)
   }
   
   # average
@@ -523,6 +535,9 @@ logit_summary2 <- data.frame("Avg of optimal thresholds" = unlist(best_tresholds
                              "Threshold for Fold5" = sapply(logit_cv_threshold, function(x) {x$threshold}),
                              "Avg expected loss" = unlist(expected_loss),
                              "Expected loss for Fold5" = unlist(logit_cv_expected_loss))
+
+
+logit_summary2
 
 kable(x = logit_summary2, format = "latex", booktabs=TRUE,  digits = 3, row.names = TRUE,
       linesep = "", col.names = c("Avg of optimal thresholds","Threshold for fold #5",
@@ -546,22 +561,24 @@ for (model_name in names(logit_cv_rocs)) {
 best_logit_with_loss <- logit_models[["X4"]]
 best_logit_optimal_treshold <- best_tresholds[["X4"]]
 
-logit_predicted_probabilities_holdout <- predict(best_logit_with_loss, newdata = data_holdout, type = "prob")
-data_holdout[,"best_logit_with_loss_pred"] <- logit_predicted_probabilities_holdout[,"default"]
+logit_predicted_probabilities_holdout <- predict(best_logit_with_loss, newdata = testing, type = "prob")
+testing[,"best_logit_with_loss_pred"] <- logit_predicted_probabilities_holdout[,"growth"]
 
 # ROC curve on holdout
-roc_obj_holdout <- roc(data_holdout$default, data_holdout[, "best_logit_with_loss_pred", drop=TRUE])
+roc_obj_holdout <- roc(testing$sales_growth, testing[, "best_logit_with_loss_pred", drop=TRUE])
 
 # Get expected loss on holdout
 holdout_treshold <- coords(roc_obj_holdout, x = best_logit_optimal_treshold, input= "threshold",
                            ret="all", transpose = FALSE)
-expected_loss_holdout <- (holdout_treshold$fp*FP + holdout_treshold$fn*FN)/length(data_holdout$default)
+expected_loss_holdout <- (holdout_treshold$fp*FP + holdout_treshold$fn*FN)/length(testing$sales_growth)
 expected_loss_holdout
 
 # Confusion table on holdout with optimal threshold
 holdout_prediction <-
-  ifelse(data_holdout$best_logit_with_loss_pred < best_logit_optimal_treshold, "no_default", "default") %>%
-  factor(levels = c("no_default", "default"))
-cm_object3 <- confusionMatrix(holdout_prediction,data_holdout$default_f)
+  ifelse(testing$best_logit_with_loss_pred < best_logit_optimal_treshold, "growth", "no_growth") %>%
+  factor(levels = c("growth", "no_growth"))
+cm_object3 <- confusionMatrix(holdout_prediction,testing$sales_growth_f)
 cm3 <- cm_object3$table
 cm3
+
+

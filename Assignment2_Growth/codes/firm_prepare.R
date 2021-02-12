@@ -339,13 +339,13 @@ ggplot(data = df, aes(x=d1_sales_mil_log_mod, y=as.numeric(sales_growth))) +
 ggplot(data = df, aes(x=log(curr_assets), y=as.numeric(sales_growth))) +
   geom_point(size=2,  shape=20, stroke=2, fill="blue", color="blue") +
   geom_smooth(method="loess", se=F, colour="black", size=1.5, span=0.9) +
-  labs(x = "currents assets",y = "sales growth") +
+  labs(x = "log currents assets",y = "sales growth") +
   theme_bg() 
 
 ggplot(data = df, aes(x=log(curr_liab), y=as.numeric(sales_growth))) +
   geom_point(size=2,  shape=20, stroke=2, fill="blue", color="blue") +
   geom_smooth(method="loess", se=F, colour="black", size=1.5, span=0.9) +
-  labs(x = "currents liabilities",y = "sales growth") +
+  labs(x = "log currents liabilities",y = "sales growth") +
   theme_bg() 
 
 # add log_liab and log_ass to the df

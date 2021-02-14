@@ -58,6 +58,8 @@ rawvars <-  c("curr_assets", "curr_liab", "extra_exp", "extra_inc", "extra_profi
               "inc_bef_tax", "intang_assets", "inventories", "liq_assets", "material_exp", "personnel_exp",
               "profit_loss_year", "sales", "share_eq", "subscribed_cap")
 
+ass_liab_log <- c("curr_assets_log", "curr_liab_log")
+
 qualityvars <- c("balsheet_flag", "balsheet_length", "balsheet_notfullyear")
 
 engvar <- c("total_assets_bs", "fixed_assets_bs", "liq_assets_bs", "curr_assets_bs",
@@ -82,7 +84,7 @@ hr <- c("female", "ceo_age", "flag_high_ceo_age", "flag_low_ceo_age",
 
 firm <- c("age", "age2", "new", "ind2_cat", "m_region_loc", "urban_m")
 
-reg1 <- lm(formula(paste0("sales_growth ~", paste0(rawvars, collapse = " + "))),
+reg1 <- lm(formula(paste0("sales_growth ~", paste0(ass_liab_log, collapse = " + "))),
            data = df)
 
 m <- margins(reg1, vce = "none")
@@ -94,7 +96,9 @@ reg1_table <- summary(reg1) %>%
   mutate(factor = row.names(.)) %>%
   merge(summary(m)[,c("factor","AME")])
 
-reg1_glm <- glm(formula(paste0("sales_growth ~", paste0(rawvars, collapse = " + "))),
+reg1_table
+
+reg1_glm <- glm(formula(paste0("sales_growth ~", paste0(ass_liab_log, collapse = " + "))),
                 data = df)
 
 m <- margins(reg1_glm, vce = "none")
@@ -106,6 +110,7 @@ glm_reg1_table <- summary(reg1_glm) %>%
   mutate(factor = row.names(.)) %>%
   merge(summary(m)[,c("factor","AME")])
 
+glm_reg1_table
 
 #######################
 # logit 
@@ -123,11 +128,11 @@ interactions2 <- c("sales_mil_log*age", "sales_mil_log*female",
 
 
 
-X1 <- c("sales_mil_log", "sales_mil_log_sq", "d1_sales_mil_log_mod", "profit_loss_year_pl", "ind2_cat")
-X2 <- c("sales_mil_log", "sales_mil_log_sq", "d1_sales_mil_log_mod", "profit_loss_year_pl", "fixed_assets_bs","share_eq_bs","curr_liab_bs ",   "curr_liab_bs_flag_high ", "curr_liab_bs_flag_error",  "age","foreign_management" , "ind2_cat")
-X3 <- c("sales_mil_log", "sales_mil_log_sq", firm, engvar,                   d1)
-X4 <- c("sales_mil_log", "sales_mil_log_sq", firm, engvar, engvar2, engvar3, d1, hr, qualityvars)
-X5 <- c("sales_mil_log", "sales_mil_log_sq", firm, engvar, engvar2, engvar3, d1, hr, qualityvars, interactions1, interactions2)
+X1 <- c(ass_liab_log, "sales_mil_log", "sales_mil_log_sq", "d1_sales_mil_log_mod", "profit_loss_year_pl", "ind2_cat")
+X2 <- c(ass_liab_log, "sales_mil_log", "sales_mil_log_sq", "d1_sales_mil_log_mod", "profit_loss_year_pl", "fixed_assets_bs","share_eq_bs","curr_liab_bs ",   "curr_liab_bs_flag_high ", "curr_liab_bs_flag_error",  "age","foreign_management" , "ind2_cat")
+X3 <- c(ass_liab_log, "sales_mil_log", "sales_mil_log_sq", firm, engvar,                   d1)
+X4 <- c(ass_liab_log, "sales_mil_log", "sales_mil_log_sq", firm, engvar, engvar2, engvar3, d1, hr, qualityvars)
+X5 <- c(ass_liab_log, "sales_mil_log", "sales_mil_log_sq", firm, engvar, engvar2, engvar3, d1, hr, qualityvars, interactions1, interactions2)
 
 # for LASSO
 logitvars <- c("sales_mil_log", "sales_mil_log_sq", engvar, engvar2, engvar3, d1, hr, firm, qualityvars, interactions1, interactions2)
@@ -155,6 +160,8 @@ ols_table <- summary(ols_modelx1) %>%
   merge(summary(m)[,c("factor","AME")])
 
 
+ols_table
+
 m <- margins(glm_modelx1, vce = "none")
 
 glm_ols_table <- summary(glm_modelx1) %>%
@@ -164,6 +171,7 @@ glm_ols_table <- summary(glm_modelx1) %>%
   mutate(factor = row.names(.)) %>%
   merge(summary(m)[,c("factor","AME")])
 
+glm_ols_table
 
 #############################
 # Random Forest
@@ -172,7 +180,7 @@ glm_ols_table <- summary(glm_modelx1) %>%
 
 # create training and holdaout set
 # create training and holdaout set
-set.seed(15000)
+set.seed(30000)
 lenght_t <- nrow(df)
 index <- rep(NA, lenght_t)
 index <- sample(2, lenght_t, replace = TRUE, prob = c(0.7, 0.3))
@@ -199,7 +207,7 @@ tune_grid <- expand.grid(
 
 
 # simpler model for model A (1)
-set.seed(15000)
+set.seed(30000)
 system.time({
   rf_model_1 <- train(
     formula(paste0("sales_growth ~", paste0(predictors_1, collapse = " + "))),
@@ -220,7 +228,7 @@ tune_grid <- expand.grid(
   .min.node.size = c(2, 4, 6)
 )
 
-set.seed(15000)
+set.seed(30000)
 system.time({
   rf_model_2 <- train(
     formula(paste0("sales_growth ~", paste0(predictors_2, collapse = " + "))),
@@ -232,6 +240,7 @@ system.time({
   )
 })
 
+rf_model_2
 
 # put findings into table
 results <- resamples(
@@ -274,7 +283,7 @@ for (model_name in names(logit_model_vars)) {
   
   features <- logit_model_vars[[model_name]]
   
-  set.seed(15000)
+  set.seed(30000)
   glm_model <- train(
     formula(paste0("sales_growth_f ~", paste0(features, collapse = " + "))),
     method = "glm",
@@ -291,12 +300,13 @@ for (model_name in names(logit_model_vars)) {
 
 
 CV_RMSE_folds
+
 # Logit lasso -----------------------------------------------------------
 
 lambda <- 10^seq(-1, -4, length = 10)
 grid <- expand.grid("alpha" = 1, lambda = lambda)
 
-set.seed(15000)
+set.seed(30000)
 system.time({
   logit_lasso_model <- train(
     formula(paste0("sales_growth_f ~", paste0(logitvars, collapse = " + "))),
@@ -314,7 +324,6 @@ tuned_logit_lasso_model <- logit_lasso_model$finalModel
 best_lambda <- logit_lasso_model$bestTune$lambda
 logit_models[["LASSO"]] <- logit_lasso_model
 lasso_coeffs <- as.matrix(coef(tuned_logit_lasso_model, best_lambda))
-write.csv(lasso_coeffs, paste0(output, "lasso_logit_coeffs.csv"))
 
 CV_RMSE_folds[["LASSO"]] <- logit_lasso_model$resample[,c("Resample", "RMSE")]
 
@@ -337,7 +346,7 @@ for (model_name in names(logit_models)) {
       model$pred %>%
       filter(Resample == fold)
     
-    roc_obj <- roc(cv_fold$obs, cv_fold$growth)
+    roc_obj <- roc(cv_fold$obs, cv_fold$high_growth)
     auc[[fold]] <- as.numeric(roc_obj$auc)
   }
   
@@ -370,19 +379,16 @@ logit_summary1 <- data.frame("Number of predictors" = unlist(nvars),
                              "CV RMSE" = unlist(CV_RMSE),
                              "CV AUC" = unlist(CV_AUC))
 
-kable(x = logit_summary1, format = "latex", booktabs=TRUE,  digits = 3, row.names = TRUE,
-      linesep = "", col.names = c("Number of predictors","CV RMSE","CV AUC")) %>%
-  cat(.,file= paste0(output, "logit_summary1.tex"))
+logit_summary1
+
 
 # Take best model and estimate RMSE on holdout  -------------------------------------------
 
-##################
-# CHOOOOOOSE BEST LOGIT MODEL
 
 best_logit_no_loss <- logit_models[["X4"]]
 
 logit_predicted_probabilities_holdout <- predict(best_logit_no_loss, newdata = testing, type = "prob")
-testing[,"best_logit_no_loss_pred"] <- logit_predicted_probabilities_holdout[,"growth"]
+testing[,"best_logit_no_loss_pred"] <- logit_predicted_probabilities_holdout[,"high_growth"]
 RMSE(testing[, "best_logit_no_loss_pred", drop=TRUE], testing$sales_growth)
 
 # discrete ROC (with thresholds in steps) on holdout -------------------------------------------------
@@ -390,27 +396,18 @@ thresholds <- seq(0.05, 0.75, by = 0.05)
 
 
 
-
-
-######################x
-### ÁTNÉZNI!!!!!!!!!!!!!
-####################
-
-
-
-
 cm <- list()
 true_positive_rates <- c()
 false_positive_rates <- c()
 for (thr in thresholds) {
-  holdout_prediction <- ifelse(testing[,"best_logit_no_loss_pred"] < thr, "no_growth", "growth") %>%
-    factor(levels = c("no_growth", "growth"))
+  holdout_prediction <- ifelse(testing[,"best_logit_no_loss_pred"] < thr, "no_high_growth", "high_growth") %>%
+    factor(levels = c("no_high_growth", "high_growth"))
   cm_thr <- confusionMatrix(holdout_prediction,testing$sales_growth_f)$table
   cm[[as.character(thr)]] <- cm_thr
-  true_positive_rates <- c(true_positive_rates, cm_thr["growth", "growth"] /
-                             (cm_thr["growth", "growth"] + cm_thr["no_growth", "growth"]))
-  false_positive_rates <- c(false_positive_rates, cm_thr["growth", "no_growth"] /
-                              (cm_thr["growth", "no_growth"] + cm_thr["no_growth", "no_growth"]))
+  true_positive_rates <- c(true_positive_rates, cm_thr["high_growth", "high_growth"] /
+                             (cm_thr["high_growth", "high_growth"] + cm_thr["no_high_growth", "high_growth"]))
+  false_positive_rates <- c(false_positive_rates, cm_thr["high_growth", "no_high_growth"] /
+                              (cm_thr["high_growth", "no_high_growth"] + cm_thr["no_high_growth", "no_high_growth"]))
 }
 
 tpr_fpr_for_thresholds <- tibble(
@@ -449,7 +446,7 @@ summary(logit_class_prediction)
 
 # confusion matrix: summarize different type of errors and successfully predicted cases
 # positive = "yes": explicitly specify the positive case
-cm_object1 <- confusionMatrix(logit_class_prediction, testing$sales_growth_f, positive = "growth")
+cm_object1 <- confusionMatrix(logit_class_prediction, testing$sales_growth_f, positive = "high_growth")
 cm1 <- cm_object1$table
 cm1
 
@@ -457,8 +454,8 @@ cm1
 
 # 0.5 same as before
 holdout_prediction <-
-  ifelse(testing$best_logit_no_loss_pred < 0.5, "growth", "no_growth") %>%
-  factor(levels = c("growth", "no_growth"))
+  ifelse(testing$best_logit_no_loss_pred < 0.5, "no_high_growth", "high_growth") %>%
+  factor(levels = c("no_high_growth", "high_growth"))
 cm_object1b <- confusionMatrix(holdout_prediction,testing$sales_growth_f)
 cm1b <- cm_object1b$table
 cm1b
@@ -467,8 +464,8 @@ cm1b
 mean_predicted_default_prob <- mean(testing$best_logit_no_loss_pred)
 mean_predicted_default_prob
 holdout_prediction <-
-  ifelse(testing$best_logit_no_loss_pred < mean_predicted_default_prob, "growth", "no_growth") %>%
-  factor(levels = c("growth", "no_growth"))
+  ifelse(testing$best_logit_no_loss_pred < mean_predicted_default_prob, "no_high_growth", "high_growth") %>%
+  factor(levels = c("no_high_growth", "high_growth"))
 cm_object2 <- confusionMatrix(holdout_prediction,testing$sales_growth_f)
 cm2 <- cm_object2$table
 cm2
@@ -486,7 +483,7 @@ cm2
 
 # Introduce loss function
 # relative cost of of a false negative classification (as compared with a false positive classification)
-FP=1
+FP=2
 FN=10
 cost = FN/FP
 # the prevalence, or the proportion of cases in the population (n.cases/(n.controls+n.cases))
@@ -513,11 +510,11 @@ for (model_name in names(logit_models)) {
       model$pred %>%
       filter(Resample == fold)
     
-    roc_obj <- roc(cv_fold$obs, cv_fold$growth)
+    roc_obj <- roc(cv_fold$obs, cv_fold$high_growth)
     best_treshold <- coords(roc_obj, "best", ret="all", transpose = FALSE,
                             best.method="youden", best.weights=c(cost, prevelance))
     best_tresholds_cv[[fold]] <- best_treshold$threshold
-    expected_loss_cv[[fold]] <- (best_treshold$fp*FP + best_treshold$fn*FN)/length(cv_fold$sales_growth)
+    expected_loss_cv[[fold]] <- (best_treshold$fp*FP + best_treshold$fn*FN)/length(cv_fold$high_growth)
   }
   
   # average
@@ -539,11 +536,6 @@ logit_summary2 <- data.frame("Avg of optimal thresholds" = unlist(best_tresholds
 
 logit_summary2
 
-kable(x = logit_summary2, format = "latex", booktabs=TRUE,  digits = 3, row.names = TRUE,
-      linesep = "", col.names = c("Avg of optimal thresholds","Threshold for fold #5",
-                                  "Avg expected loss","Expected loss for fold #5")) %>%
-  cat(.,file= paste0(output, "logit_summary1.tex"))
-
 # Create plots based on Fold5 in CV ----------------------------------------------
 
 for (model_name in names(logit_cv_rocs)) {
@@ -562,7 +554,7 @@ best_logit_with_loss <- logit_models[["X4"]]
 best_logit_optimal_treshold <- best_tresholds[["X4"]]
 
 logit_predicted_probabilities_holdout <- predict(best_logit_with_loss, newdata = testing, type = "prob")
-testing[,"best_logit_with_loss_pred"] <- logit_predicted_probabilities_holdout[,"growth"]
+testing[,"best_logit_with_loss_pred"] <- logit_predicted_probabilities_holdout[,"high_growth"]
 
 # ROC curve on holdout
 roc_obj_holdout <- roc(testing$sales_growth, testing[, "best_logit_with_loss_pred", drop=TRUE])
@@ -574,11 +566,14 @@ expected_loss_holdout <- (holdout_treshold$fp*FP + holdout_treshold$fn*FN)/lengt
 expected_loss_holdout
 
 # Confusion table on holdout with optimal threshold
+best_logit_optimal_treshold
+
 holdout_prediction <-
-  ifelse(testing$best_logit_with_loss_pred < best_logit_optimal_treshold, "growth", "no_growth") %>%
-  factor(levels = c("growth", "no_growth"))
+  ifelse(testing$best_logit_with_loss_pred < best_logit_optimal_treshold, "no_high_growth", "high_growth" ) %>%
+  factor(levels = c("no_high_growth", "high_growth"  ))
 cm_object3 <- confusionMatrix(holdout_prediction,testing$sales_growth_f)
 cm3 <- cm_object3$table
 cm3
+
 
 

@@ -71,3 +71,4 @@ Hmisc::describe(df)
 data_out <- "C:/Users/diama/Documents/CEU-BA-Assignments/CEU-Data-Analysis-3-Assignments/Assignment3_PoolSales/data/clean/"
 write.csv(df,paste(data_out,"swim_work.csv",sep=""), row.names = FALSE)             
 
+

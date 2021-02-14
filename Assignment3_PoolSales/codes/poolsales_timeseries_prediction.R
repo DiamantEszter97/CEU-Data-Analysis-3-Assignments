@@ -71,6 +71,8 @@ df <- df %>%
   mutate(QUANTITY2 = ifelse(QUANTITY<1, 1, QUANTITY)) %>% 
   mutate(q_ln = log(QUANTITY2))
 
+skimr::skim(df)
+
 df <- 
   df %>% 
   group_by(month, dow) %>% 
@@ -101,7 +103,7 @@ g1 <-ggplot(data=df[df$year==2015,], aes(x=date, y=QUANTITY)) +
 g1
 
 
-g2<-ggplot(data=df[(df$year>=2010) & (df$year<=2014),], aes(x=date, y=QUANTITY)) +
+g2<-ggplot(data=df[(df$year>=2012) & (df$year<=2014),], aes(x=date, y=QUANTITY)) +
   geom_line(size=0.2, color=color[1]) +
   theme_bg() +
   scale_x_date(breaks = as.Date(c("2010-01-01","2011-01-01","2012-01-01","2013-01-01","2014-01-01","2015-01-01")),
@@ -192,7 +194,6 @@ reg1 <- train(
 
 
 
-
 #Model 2 linear trend + monthly seasonality + days of week  seasonality + holidays + interactions
 model2 <- as.formula(QUANTITY ~ 1 + trend + month + dow + isHoliday + school_off*dow + weekend*month)
 reg2 <- train(
@@ -210,6 +211,7 @@ reg3 <- train(
   data = data_train,
   trControl = train_control
 )
+
 
 
 # Get CV RMSE ----------------------------------------------
@@ -233,35 +235,13 @@ rmse_CV["reg3"] <- reg3$pred %>%
   as.numeric()
 rmse_CV
 
-# Use prophet prediction -------------------------------------------
-# add CV into prophet
-# can be done with prophet: https://facebook.github.io/prophet/docs/diagnostics.html
-# done but this is a different cross-validation as for the other models as it must be time-series like
-
-# prophet -  multiplicative option -- tried but produced much worse results (~34. RMSE)
-
-
-model_prophet <- prophet( fit=F, 
-                          seasonality.mode = "additive", 
-                          yearly.seasonality = "auto",
-                          weekly.seasonality = "auto",
-                          growth = "linear",
-                          daily.seasonality=TRUE)
-
-model_prophet <-  add_country_holidays(model_prophet, "US")
-model_prophet <- fit.prophet(model_prophet, df= data.frame(ds = data_train$date,
-                                                           y = data_train$QUANTITY ))
-
-cv_pred <- cross_validation(model_prophet, initial = 365, period = 365, horizon = 365, units = 'days')
-rmse_prophet_cv <- performance_metrics(cv_pred, rolling_window = 1)$rmse
-rmse_prophet_cv
 
 ###########################x
 # Evaluate best model on holdout set --------------------------------------------
 ###########################x
 
 data_holdout <- data_holdout %>% 
-  mutate(y_hat_5 = predict(reg3, newdata = .))
+  mutate(y_hat_5 = predict(reg2, newdata = .))
 
 rmse_holdout_best <- RMSE(data_holdout$QUANTITY, data_holdout$y_hat_5)
 rmse_holdout_best
@@ -316,13 +296,12 @@ g_predictions
 
 
 
-g_predictions_m <- ggplot(data=data_holdout %>% filter(month==8), aes(x=date, y=QUANTITY)) +
+g_predictions_m <- ggplot(data=data_holdout, aes(x=date, y=QUANTITY)) +
   geom_line(aes(size="Actual", colour="Actual", linetype = "Actual") ) +
   geom_line(aes(y=y_hat_5, size="Predicted" ,colour="Predicted",  linetype= "Predicted")) +
   geom_ribbon(aes(ymin=QUANTITY,ymax=y_hat_5), fill=color[4], alpha=0.3) +
-  scale_y_continuous(expand = c(0.01,0.01), limits = c(0,150))+
-  scale_x_date(expand=c(0.01,0.01), breaks = as.Date(c("2016-08-01","2016-08-08","2016-08-15","2016-08-22","2016-08-29")),
-               limits = as.Date(c("2016-08-01","2016-08-31")),
+  scale_x_date(expand=c(0.01,0.01), breaks = as.Date(c("2016-1-01","2016-04-01","2016-07-01","2016-10-01","2016-12-31")),
+               limits = as.Date(c("2016-01-01","2016-12-31")),
                labels = date_format("%d%b")) +
   scale_color_manual(values=color[1:2], name="")+
   scale_size_manual(name="", values=c(0.4,0.7))+
@@ -343,3 +322,28 @@ g_predictions_m <- ggplot(data=data_holdout %>% filter(month==8), aes(x=date, y=
 g_predictions_m
 
 
+
+g_predictions_m2 <- ggplot(data=data_holdout %>% filter(month==8), aes(x=date, y=QUANTITY)) +
+  geom_line(aes(size="Actual", colour="Actual", linetype = "Actual") ) +
+  geom_line(aes(y=y_hat_5, size="Predicted" ,colour="Predicted",  linetype= "Predicted")) +
+  geom_ribbon(aes(ymin=QUANTITY,ymax=y_hat_5), fill=color[4], alpha=0.3) +
+  scale_x_date(expand=c(0.01,0.01), breaks = as.Date(c("2016-08-01","2016-08-08","2016-08-15","2016-08-22","2016-08-29")),
+               limits = as.Date(c("2016-08-01","2016-08-31")),
+               labels = date_format("%d%b")) +
+  scale_color_manual(values=color[1:2], name="")+
+  scale_size_manual(name="", values=c(0.4,0.7))+
+  #scale_linetype_manual(name = "", values=c("solid", "solid")) +
+  scale_linetype_manual(name = "", values=c("solid", "twodash")) +
+  labs( x = "Date (day)", y="Daily ticket sales" ) +
+  theme_bg() +
+  #theme(legend.position = "none") +
+  #annotate("text", x = as.Date("2016-08-04"), y = 55, label = "Actual", color=color[2], size=2)+
+  #annotate("text", x = as.Date("2016-08-17"), y = 115, label = "Predicted", color=color[1], size=2)
+  theme(legend.position=c(0.7,0.8),
+        legend.direction = "horizontal",
+        legend.text = element_text(size = 4),
+        legend.key.width = unit(.8, "cm"),
+        legend.key.height = unit(.2, "cm")) + 
+  guides(linetype = guide_legend(override.aes = list(size = 0.6))
+  )
+g_predictions_m2

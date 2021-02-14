@@ -39,7 +39,7 @@ df <- first_df
 
 # filter for ADMISTIER3
 df <- df %>%  filter(Category %in%  c("ADMISTIER1", "ADMISTIER2", "ADMISTIER3" )) %>% 
-                        filter(Location %in%  c("AQHP01", "AQLP01", "AQMP01", "AQSP01", "AQVP01", "AQWP01") )
+                        filter(Location %in%  c("AQSP01", "AQEI01", "AQEJ01", "AQMP01", "AQRG01", "AQSV01", "AQWP01") )
 
 # set date_time column for datetime and set workfile
 df <- df %>%
